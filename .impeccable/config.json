@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "1.28rem",
+        "createdAt": "2026-08-22T18:11:07.790Z",
+        "reason": "reviewed build: máximo de clamp() del h1 de marca (título display responsivo); límite superior fluido intencional, no un paso de escala"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "1.7rem",
+        "createdAt": "2026-08-22T18:11:07.840Z",
+        "reason": "reviewed build: máximo de clamp() del h2 de estado vacío (título display responsivo); límite superior fluido intencional, no un paso de escala"
+      }
+    ]
+  }
+}

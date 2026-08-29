@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-22T00:00:00.000Z",
+  "title": "Design System: Informe de Acceso Estudiantil UNIFRANZ",
+  "extensions": {
+    "colorMeta": {
+      "accent": { "role": "primary", "displayName": "Naranja UNIFRANZ", "canonical": "#ef5a22", "tonalRamp": ["#3a1206", "#6b220b", "#9c3312", "#c8461b", "#ef5a22", "#f47c4d", "#f8a37f", "#fdece4"] },
+      "series-2": { "role": "secondary", "displayName": "Neutro de Serie", "canonical": "#a8a8ae", "tonalRamp": ["#2a2a2f", "#3f3f45", "#55555e", "#6f6f77", "#a8a8ae", "#c4c4c9", "#dcdce0", "#efeff1"] },
+      "alert": { "role": "tertiary", "displayName": "Rojo de Alerta", "canonical": "#d92d20", "tonalRamp": ["#3a0c08", "#5f130d", "#8a1c13", "#b3241a", "#d92d20", "#e5584d", "#f08a83", "#fce9e7"] },
+      "bg": { "role": "neutral", "displayName": "Fondo Casi Neutro", "canonical": "#f4f4f3", "tonalRamp": ["#0c0c0e", "#151518", "#232329", "#3f3f46", "#71717a", "#a8a8ae", "#e5e5e6", "#f4f4f3"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Cifra protagonista del héroe (asistencia % o ingresos)." },
+      "headline": { "displayName": "Headline", "purpose": "Títulos de panel y cifras de stat." },
+      "body": { "displayName": "Body", "purpose": "Texto general y notas de panel." },
+      "label": { "displayName": "Label", "purpose": "Claves de stat, códigos de carrera, legendas." }
+    },
+    "shadows": [
+      { "name": "card-lift", "value": "0 1px 2px rgba(24,24,27,.05), 0 10px 28px -14px rgba(24,24,27,.18)", "purpose": "Eleva paneles, zonas de carga y la banda de resumen sobre el fondo." },
+      { "name": "card-lift-dark", "value": "0 1px 2px rgba(0,0,0,.4), 0 16px 40px -18px rgba(0,0,0,.7)", "purpose": "Equivalente en tema oscuro." },
+      { "name": "drop-focus", "value": "0 0 0 3px var(--accent-soft), 0 1px 2px rgba(24,24,27,.05), 0 10px 28px -14px rgba(24,24,27,.18)", "purpose": "Estado is-over al arrastrar un archivo sobre la zona de carga." }
+    ],
+    "motion": [
+      { "name": "ease-out-soft", "value": "cubic-bezier(.2,.8,.2,1)", "purpose": "Crecimiento de barras (scaleX/scaleY) en la revelación de datos." },
+      { "name": "count-up", "value": "cubic ease-out, ~620ms", "purpose": "Conteo ascendente de cifras al renderizar el informe." },
+      { "name": "reveal-stagger", "value": "0.03s por barra, tope 0.15s", "purpose": "Escalonado de las barras horizontales." }
+    ],
+    "breakpoints": [
+      { "name": "stack", "value": "860px" },
+      { "name": "compact", "value": "520px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón Primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción primaria (Ver listado); fondo naranja con icono SVG.",
+      "html": "<button class=\"ds-btn-primary\">Ver listado <span>(848)</span></button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; gap:8px; font:600 .86rem 'Inter Variable',sans-serif; padding:9px 15px; border:1px solid transparent; border-radius:10px; background:var(--accent,#ef5a22); color:#fff; cursor:pointer; transition:filter .16s; } .ds-btn-primary:hover{ filter:brightness(1.06); } .ds-btn-primary:focus-visible{ outline:2px solid var(--accent,#ef5a22); outline-offset:2px; }"
+    },
+    {
+      "name": "Botón Ghost",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Acción secundaria (Exportar CSV); contorno neutro.",
+      "html": "<button class=\"ds-btn-ghost\">Exportar CSV</button>",
+      "css": ".ds-btn-ghost { display:inline-flex; align-items:center; gap:8px; font:600 .86rem 'Inter Variable',sans-serif; padding:9px 15px; border:1px solid var(--border,#e5e5e6); border-radius:10px; background:var(--surface,#fff); color:var(--ink-2,#3f3f46); cursor:pointer; transition:border-color .16s,color .16s; } .ds-btn-ghost:hover{ border-color:var(--muted,#71717a); color:var(--ink,#18181b); }"
+    },
+    {
+      "name": "Zona de Carga",
+      "kind": "input",
+      "refersTo": "card",
+      "description": "Tarjeta-etiqueta que envuelve un input file oculto; estados idle/busy/done/error/is-over.",
+      "html": "<label class=\"ds-drop\"><span class=\"ds-drop__title\">Registro de molinetes</span><span class=\"ds-drop__status\">Arrastra o haz clic · .xls / .xlsx</span></label>",
+      "css": ".ds-drop { display:flex; flex-direction:column; gap:1px; padding:14px 16px; background:var(--surface,#fff); border:1px solid var(--border,#e5e5e6); border-radius:14px; box-shadow:0 1px 2px rgba(24,24,27,.05),0 10px 28px -14px rgba(24,24,27,.18); cursor:pointer; transition:border-color .18s,transform .18s; } .ds-drop:hover{ border-color:color-mix(in srgb,var(--accent,#ef5a22) 45%,var(--border,#e5e5e6)); } .ds-drop__title{ font-weight:600; font-size:.92rem; color:var(--ink,#18181b); } .ds-drop__status{ font-size:.78rem; color:var(--muted,#71717a); }"
+    },
+    {
+      "name": "Barra de Datos",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Fila código · pista · valor con relleno naranja; base de los desgloses por carrera.",
+      "html": "<div class=\"ds-cbar\"><div class=\"ds-cbar__id\"><b>MED</b> <i>Medicina</i></div><div class=\"ds-cbar__track\"><span class=\"ds-cbar__fill\" style=\"width:100%\"></span></div><div class=\"ds-cbar__val\">3.906</div></div>",
+      "css": ".ds-cbar { display:grid; grid-template-columns:minmax(64px,190px) 1fr auto; align-items:center; gap:14px; font-family:'Inter Variable',sans-serif; } .ds-cbar__id b{ font-weight:700; font-size:.82rem; } .ds-cbar__id i{ font-style:normal; font-size:.76rem; color:var(--muted,#71717a); } .ds-cbar__track{ height:12px; background:var(--track,#ededee); border-radius:999px; overflow:hidden; } .ds-cbar__fill{ display:block; height:100%; background:var(--accent,#ef5a22); border-radius:999px; } .ds-cbar__val{ font-weight:600; font-size:.88rem; font-variant-numeric:tabular-nums; text-align:right; }"
+    },
+    {
+      "name": "Cifra Héroe",
+      "kind": "custom",
+      "refersTo": "stat-figure",
+      "description": "La cifra protagonista de la banda de resumen.",
+      "html": "<div class=\"ds-hero\"><div class=\"ds-hero__num\">43,6%</div><div class=\"ds-hero__label\">Asistencia promedio diaria</div></div>",
+      "css": ".ds-hero__num { font-family:'Inter Tight Variable',sans-serif; font-weight:650; font-size:clamp(2.6rem,5.4vw,4rem); line-height:.95; letter-spacing:-0.04em; color:var(--accent,#ef5a22); font-variant-numeric:tabular-nums; } .ds-hero__label{ font:600 .98rem 'Inter Variable',sans-serif; color:var(--ink,#18181b); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El Boletín de Control",
+    "overview": "Un panel institucional que convierte un export crudo de molinetes ZKTeco en una sola pantalla legible y confiable. La personalidad es la de un boletín de control serio: calmo, denso donde importa, sin adornos. Toma su vara de oficio de Linear (jerarquía sobria, densidad cómoda, detalle preciso) y de Vercel/Observable (claridad en la visualización de datos). Cada banda de la página afirma una verdad dominante; el naranja de UNIFRANZ aparece una sola vez como acento. Rechaza el rut del dashboard SaaS: sin sidebar, sin índigo, sin tarjetas-sparkline idénticas como estructura.",
+    "keyCharacteristics": [
+      "Un único acento (naranja) sobre base casi neutra.",
+      "Numerales tabulares en toda cifra; Inter Tight para display, Inter para UI.",
+      "Gráficos de datos dibujados a mano en SVG, planos y precisos.",
+      "Rojo reservado, por ley, solo para bloqueo/denegación por deuda.",
+      "Claro y oscuro como pares de primera clase."
+    ],
+    "rules": [
+      { "name": "La Regla del Acento Único", "body": "El naranja es el único color de marca en pantalla; entradas y estructura lo usan, todo lo demás es neutro. Si aparece un segundo acento, algo se rompió.", "section": "colors" },
+      { "name": "La Regla del Rojo Reservado", "body": "El rojo solo significa bloqueo/denegación por deuda. Nunca es decorativo ni un segundo acento.", "section": "colors" },
+      { "name": "La Regla de los Numerales Tabulares", "body": "Toda cifra usa font-variant-numeric: tabular-nums para que columnas y comparaciones alineen. Sin excepción.", "section": "typography" },
+      { "name": "La Regla Plana-con-Lift", "body": "Las superficies son planas; la profundidad la da una sola sombra suave (offset + blur), nunca un halo sin offset ni una sombra dura de bloque.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do usar el naranja como acento único; deja que su rareza lo haga leer.",
+      "Do reservar el rojo exclusivamente para bloqueo/denegación por deuda.",
+      "Do aplicar numerales tabulares a toda cifra.",
+      "Do dibujar iconos como SVG de trazo consistente y gráficos como SVG a medida.",
+      "Do tematizar las superficies del navegador (selección, caret, scrollbar, foco) desde la paleta."
+    ],
+    "donts": [
+      "Don't introducir un segundo acento de color ni un shell de sidebar/índigo.",
+      "Don't usar sombras duras de bloque, gradient text, franjas laterales de color, ni caras de sistema como display.",
+      "Don't convertir el badge Principal (etiqueta funcional de la zona de carga) en un kicker/eyebrow sobre títulos.",
+      "Don't apilar tarjetas idénticas como estructura de página; usa jerarquía."
+    ]
+  }
+}
