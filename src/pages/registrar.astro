@@ -1,0 +1,30 @@
+---
+import Informe from '../layouts/Informe.astro';
+---
+
+<Informe titulo="Archivos de referencia">
+  <p slot="subtitulo" class="period">Quedan guardados en el servidor</p>
+
+  <a slot="acciones" class="navlink" href="/principal">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    Volver al informe
+  </a>
+
+  <main class="wrap">
+    <section class="intro">
+      <h2>Archivos que usa el informe</h2>
+      <p>
+        Estos dos archivos cambian cada varios meses, así que se guardan una vez y el informe
+        los toma solo: en la pantalla principal ya solo hay que soltar el export de molinetes.
+        Al subir uno nuevo <strong>reemplaza al que estaba</strong>. El tipo se reconoce por el
+        contenido del archivo, no por su nombre, y si no corresponde se rechaza sin tocar nada.
+      </p>
+    </section>
+
+    <div id="reg" class="reg" aria-live="polite"></div>
+  </main>
+</Informe>
+
+<script>
+  import '../scripts/registrar.js';
+</script>

@@ -11,7 +11,13 @@ const shortDate = (day) => {
   return m ? `${m[3]}/${m[2]}` : day;
 };
 
-/* Afluencia por hora del día: columnas agrupadas entradas/salidas. */
+/* Afluencia por hora del día: columnas agrupadas entradas/salidas.
+
+   Las salidas no son el espejo de las entradas y por eso se muestran: dicen
+   cuánta gente queda adentro a cada hora (entradas menos salidas acumuladas),
+   cuánto se quedan, y a qué hora se satura la portería de vuelta. También son
+   el control de calidad de la dirección: una entrada carga temprano y una
+   salida carga tarde, así que un paso mal etiquetado se delata por su forma. */
 export function hourlyChart(hourEnt, hourSal, opts = {}) {
   const W = opts.w || 760, H = opts.h || 268, padL = 44, padR = 12, padT = 32, padB = 30;
   const iw = W - padL - padR, ih = H - padT - padB;
@@ -113,7 +119,7 @@ export function dailyTrend(days, perDayEntradas, opts = {}) {
 
 /* Mapa de calor día × hora: una fila por día del rango, 24 columnas (00–23).
    Muestra pasajes (sin deduplicar), igual que el gráfico de afluencia.
-   metric: 'ent' entradas · 'sal' salidas · 'total' ambas. */
+   metric: 'ent' entradas · 'sal' salidas. */
 const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 export function dayLabel(day) {
   return `${weekday(day)} ${shortDate(day)}`;
@@ -131,7 +137,7 @@ export function hourHeatmap(labels, rows, metric = 'ent', opts = {}) {
   const padL = opts.padL || 92;
   const W = padL + 24 * (cell + gap) + padR;
   const H = padT + labels.length * (cell + gap) + padB;
-  const at = (r, h) => (metric === 'sal' ? r.sal[h] : metric === 'total' ? r.ent[h] + r.sal[h] : r.ent[h]);
+  const at = (r, h) => (metric === 'sal' ? r.sal[h] : r.ent[h]);
 
   let max = 1;
   for (const r of rows) for (let h = 0; h < 24; h++) max = Math.max(max, at(r, h));
@@ -141,7 +147,7 @@ export function hourHeatmap(labels, rows, metric = 'ent', opts = {}) {
     head += `<text class="axis" x="${(padL + h * (cell + gap) + cell / 2).toFixed(1)}" y="${padT - 10}" text-anchor="middle">${String(h).padStart(2, '0')}</text>`;
   }
 
-  const label = metric === 'sal' ? 'salidas' : metric === 'total' ? 'pasajes' : 'entradas';
+  const label = metric === 'sal' ? 'salidas' : 'entradas';
   let body = '';
   rows.forEach((r, i) => {
     const y = padT + i * (cell + gap);

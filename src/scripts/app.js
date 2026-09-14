@@ -1,15 +1,20 @@
 import {
-  readWorkbook, detectKind, parseMolinetes, aggregate, parseBD, parseNuevos,
-  resolveBlockedList, careerName, linkCareers, UNKNOWN_CAREER,
+  readWorkbook, detectKind, parseMolinetes, aggregate, parseBD,
+  parseUsuarios, resolveBlockedList, careerName, linkStudents, cohortFor,
 } from './parse.js';
 import { hourlyChart, dailyTrend, hourHeatmap, heatmapLegend, dayLabel, fmtInt, fmtPct } from './charts.js';
+import { initTheme } from './theme.js';
 
-/* molRaw = eventos crudos del archivo; mol = métricas del rango seleccionado. */
-const state = { molRaw: null, mol: null, bd: null, nuevos: null, from: null, to: null };
+/* molRaw = eventos crudos del archivo; mol = métricas del rango seleccionado.
+   usuarios = padrón del ZKTeco, el puente entre el ID del molinete y el CI. */
+const state = { molRaw: null, mol: null, bd: null, usuarios: null, nuevos: null, from: null, to: null };
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const KIND_LABEL = { molinetes: 'Registro de molinetes', bd: 'BD de estudiantes', nuevos: 'Nuevos inscritos' };
+const KIND_LABEL = {
+  molinetes: 'Registro de molinetes', bd: 'BD de estudiantes',
+  usuarios: 'Usuarios del ZKTeco', nuevos: 'Nuevos inscritos',
+};
 
 const MESES = {
   '01': 'ene', '02': 'feb', '03': 'mar', '04': 'abr', '05': 'may', '06': 'jun',
@@ -22,35 +27,35 @@ function humanDate(day) {
 
 /* ---------- carga de archivos ---------- */
 
+/* Esta vista solo recibe el export de molinetes. La BD y el padrón se
+   registran una vez en /registrar y se cargan solos, así que soltarlos acá es
+   casi siempre una confusión: se rechaza y se dice dónde van. */
+const OTRO_SITIO = {
+  bd: 'la BD de estudiantes',
+  usuarios: 'el padrón de usuarios del ZKTeco',
+};
+
 async function handleFiles(fileList, hintKind) {
   for (const file of fileList) {
-    const zone = hintKind && zoneEl(hintKind);
     try {
       setZoneState(hintKind, 'busy', 'Procesando…', file.name);
       await raf();
-      const buf = await file.arrayBuffer();
-      const wb = readWorkbook(buf);
+      const wb = readWorkbook(await file.arrayBuffer());
       const kind = detectKind(wb);
-      if (kind === 'desconocido') {
-        setZoneState(hintKind, 'error', 'Archivo no reconocido', file.name);
+
+      if (kind !== 'molinetes') {
+        const qué = OTRO_SITIO[kind];
+        setZoneState(hintKind, 'error',
+          qué ? `Eso es ${qué} · va en Archivos de referencia` : 'Archivo no reconocido',
+          file.name);
         continue;
       }
-      if (kind === 'molinetes') {
-        state.molRaw = parseMolinetes(wb);
-        state.from = state.molRaw.minDay;            // rango inicial = todo el archivo
-        state.to = state.molRaw.maxDay;
-        recompute();
-      }
-      else if (kind === 'bd') {
-        state.bd = parseBD(wb);
-        recompute();      // la BD es la que pone la carrera: hay que recalcular
-      }
-      else if (kind === 'nuevos') state.nuevos = parseNuevos(wb);
 
-      // el archivo puede haber caído en otra zona: reflejarlo en la correcta
-      const rightZone = zoneEl(kind);
-      setZoneStateEl(rightZone, 'done', okMsg(kind), file.name);
-      if (hintKind && hintKind !== kind && zone) resetZone(zone);
+      state.molRaw = parseMolinetes(wb);
+      state.from = state.molRaw.minDay;              // rango inicial = todo el archivo
+      state.to = state.molRaw.maxDay;
+      recompute();
+      setZoneState(hintKind, 'done', `${fmtInt(state.mol.entradasUnicas)} ingresos únicos`, file.name);
       renderAll();
     } catch (err) {
       console.error(err);
@@ -59,11 +64,68 @@ async function handleFiles(fileList, hintKind) {
   }
 }
 
-function okMsg(kind) {
-  if (kind === 'molinetes') return `${fmtInt(state.mol.entradasUnicas)} ingresos únicos`;
-  if (kind === 'bd') return `${fmtInt(state.bd.total)} estudiantes activos`;
-  if (kind === 'nuevos') return `${fmtInt(state.nuevos.total)} nuevos inscritos`;
-  return 'Listo';
+/* ---------- archivos de referencia guardados en el servidor ----------
+
+   La BD y el padrón se registran en /registrar y viven en disco. Acá se piden
+   al arrancar para que el informe salga completo sin volver a subirlos. Si el
+   servidor no responde el informe igual funciona: se degrada a lo que el propio
+   export de molinetes puede decir, y la línea de estado lo explica. */
+async function cargarReferencias() {
+  const linea = $('#fuentes');
+  if (linea) linea.textContent = 'Cargando archivos de referencia…';
+
+  let disponibles = {};
+  try {
+    const r = await fetch('/api/archivos', { cache: 'no-store' });
+    if (!r.ok) throw new Error(`el servidor respondió ${r.status}`);
+    disponibles = (await r.json()).archivos || {};
+  } catch (err) {
+    if (linea) {
+      linea.className = 'fuentes fuentes--err';
+      linea.textContent = `No se pudieron cargar los archivos de referencia (${err.message}). El informe se calcula igual, sin carrera ni CI.`;
+    }
+    return;
+  }
+
+  const traer = async (kind, parse, asigna) => {
+    if (!disponibles[kind]) return null;
+    try {
+      const r = await fetch(`/api/archivos/${kind}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(String(r.status));
+      asigna(parse(readWorkbook(await r.arrayBuffer())));
+      return disponibles[kind].nombre;
+    } catch (err) {
+      console.error(`No se pudo leer el archivo «${kind}»`, err);
+      return null;
+    }
+  };
+
+  await traer('bd', parseBD, (v) => { state.bd = v; });
+  await traer('usuarios', parseUsuarios, (v) => { state.usuarios = v; });
+
+  recompute();
+  renderFuentes();
+  renderAll();
+}
+
+function renderFuentes() {
+  const linea = $('#fuentes');
+  if (!linea) return;
+  const partes = [];
+  if (state.bd) partes.push(`BD · ${fmtInt(state.bd.total)} activos`);
+  if (state.usuarios) partes.push(`padrón ZKTeco · ${fmtInt(state.usuarios.total)} usuarios`);
+
+  if (!partes.length) {
+    linea.className = 'fuentes fuentes--err';
+    linea.innerHTML = 'Sin archivos de referencia: no habrá carrera, CI ni tasa de asistencia. '
+      + '<a href="/registrar">Registrarlos</a>.';
+    return;
+  }
+  const faltan = !state.bd ? 'falta la BD de estudiantes'
+    : !state.usuarios ? 'falta el padrón del ZKTeco (el cruce por CI queda fuera)' : '';
+  linea.className = 'fuentes';
+  linea.innerHTML = `${partes.join(' · ')}${faltan ? ` · <b>${faltan}</b>` : ''} `
+    + '<a href="/registrar">Cambiar</a>';
 }
 
 const raf = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -75,19 +137,14 @@ function setZoneStateEl(el, st, msg, name) {
   $('.drop__status', el).textContent = msg;
   if (name) $('.drop__file', el).textContent = name;
 }
-function resetZone(el) {
-  el.dataset.state = 'idle';
-  $('.drop__status', el).textContent = el.dataset.hint;
-  $('.drop__file', el).textContent = '';
-}
 
 /* ---------- rango de fechas ---------- */
 
 /* Recalcula todo el informe desde los eventos ya parseados: no relee el Excel. */
 function recompute() {
   if (!state.molRaw) { state.mol = null; return; }
-  linkCareers(state.molRaw, state.bd);
-  state.mol = aggregate(state.molRaw, state.from, state.to);
+  linkStudents(state.molRaw, state.bd, state.usuarios);
+  state.mol = aggregate(state.molRaw, state.from, state.to, state.bd);
 }
 
 function setRange(from, to) {
@@ -165,6 +222,7 @@ function renderAll() {
   renderPeakCareers(m);
   $('#chart-daily').innerHTML = dailyTrend(m.days, m.perDayEntradas, { salidas: m.perDaySalidas });
   renderCareers(m);
+  renderRoster(m);
   renderBlocked(m);
   renderAdmissions();
   playReveal();
@@ -172,14 +230,18 @@ function renderAll() {
 
 function renderSummary(m) {
   const bd = state.bd;
+  const ros = m.roster;
   /* Sin promedios: es la razón directa entre dos conteos verificables —
-     personas distintas que ingresaron en el período ÷ activos de la BD. */
-  const rate = bd && bd.total ? m.distinctInPeriod / bd.total : null;
+     estudiantes ACTIVOS identificados que ingresaron ÷ total de activos de la
+     BD. El numerador sale del padrón, no de los IDs crudos del molinete: por la
+     puerta también pasa gente que ya no está inscrita en la gestión, y contarla
+     inflaba la tasa. */
+  const rate = ros && ros.activos ? ros.tasa : null;
   const hero = rate != null
     ? {
         big: fmtPct(rate),
         label: 'Asistencia del período',
-        sub: `${fmtInt(m.distinctInPeriod)} de ${fmtInt(bd.total)} estudiantes activos ingresó al menos una vez`,
+        sub: `${fmtInt(ros.asistieron)} de ${fmtInt(ros.activos)} estudiantes activos ingresó al menos una vez`,
       }
     : { big: fmtInt(m.entradasUnicas), label: 'Ingresos únicos', sub: 'Carga la BD de estudiantes para ver la asistencia (%)' };
 
@@ -189,13 +251,15 @@ function renderSummary(m) {
     { v: fmtInt(m.blockedCount), k: 'Bloqueados por deuda', tone: 'alert' },
   ];
 
-  /* Antiguos y nuevos salen los dos de la columna «Gestión» de la BD, así que
-     su suma cierra exactamente el total de activos (2.526 + 164 = 2.690). */
-  if (bd) {
-    const difiere = state.nuevos && state.nuevos.total !== bd.nuevos;
-    stats.push({ v: fmtInt(bd.antiguos), k: 'Estudiantes antiguos' });
+  /* Antiguos y nuevos parten el total de activos, así que su suma lo cierra
+     exactamente. Nuevo = ingresó en GESTION_ACTUAL (parse.js); no depende del
+     rango de fechas que se esté mirando. */
+  const coh = bd ? cohortFor(bd) : null;
+  if (coh) {
+    const difiere = state.nuevos && state.nuevos.total !== coh.nuevos;
+    stats.push({ v: fmtInt(coh.antiguos), k: 'Estudiantes antiguos' });
     stats.push({
-      v: fmtInt(bd.nuevos),
+      v: fmtInt(coh.nuevos),
       k: 'Nuevos inscritos',
       // solo aparece si los dos archivos se contradicen; en el caso normal, nada
       note: difiere ? `admisiones dice ${fmtInt(state.nuevos.total)}` : '',
@@ -236,7 +300,7 @@ function renderPeakCareers(m) {
 
 function renderCareers(m) {
   const max = Math.max(1, ...m.byCareer.map((c) => c.entradas));
-  renderCareerCoverage(m);
+  renderCareerCoverage();
   $('#careers').innerHTML = m.byCareer.map((c) => `
     <div class="cbar">
       <div class="cbar__id"><span class="cbar__code">${c.code}</span><span class="cbar__name">${careerName(c.code) === c.code ? '' : careerName(c.code)}</span></div>
@@ -249,22 +313,43 @@ function renderCareers(m) {
    apellido contra la BD. El cruce nunca es perfecto (nombres escritos distinto
    en los dos sistemas), así que se dice cuántos quedaron sin identificar en vez
    de presentar el desglose como completo. */
-function renderCareerCoverage(m) {
+function renderCareerCoverage() {
   const el = $('#careers-coverage');
   if (!el) return;
-  const { students, unresolved } = m.careerCoverage;
-  if (!state.bd) {
-    el.textContent = 'Carga la BD de estudiantes para desglosar por carrera.';
-  } else if (unresolved) {
-    el.textContent = `${fmtInt(unresolved)} de ${fmtInt(students)} estudiantes no coinciden por nombre con la BD: van en «${UNKNOWN_CAREER}».`;
-  } else {
-    el.textContent = '';
-  }
+  el.textContent = state.bd ? '' : 'Carga la BD de estudiantes para desglosar por carrera.';
+}
+
+/* ---------- padrón del rango ----------
+   Quién vino y quién no. El archivo de eventos cubre solo las fechas pedidas al
+   exportar, así que la ausencia es un dato normal — no un error de cruce — y el
+   informe tiene que decirlo con todas las letras para que nadie lo lea como un
+   fallo del cruce de nombres. */
+function renderRoster(m) {
+  const ros = m.roster;
+  const sec = $('#roster');
+  if (!sec) return;
+  sec.hidden = !ros;
+  if (!ros) return;
+
+  $('#roster-attended').textContent = fmtInt(ros.asistieron);
+  $('#roster-active').textContent = fmtInt(ros.activos);
+  $('#roster-rate').textContent = fmtPct(ros.tasa);
+
+  /* La barra es el PORCENTAJE, no el conteo: así se comparan carreras de
+     tamaños muy distintos. En crudo, MED (762 inscritos) tapaba a todas. */
+  $('#roster-careers').innerHTML = ros.porCarrera.map((c) => `
+    <div class="cbar">
+      <div class="cbar__id"><span class="cbar__code">${c.code}</span><span class="cbar__name">${careerName(c.code) === c.code ? '' : careerName(c.code)}</span></div>
+      <div class="cbar__track"><span class="cbar__fill" style="--w:${(c.tasa * 100).toFixed(1)}%"></span></div>
+      <div class="cbar__val">${fmtPct(c.tasa)}<span class="cbar__sub">${fmtInt(c.vinieron)}/${fmtInt(c.total)}</span></div>
+    </div>`).join('');
+
+  state._absentList = ros.ausentesList;
 }
 
 function renderBlocked(m) {
   const bd = state.bd;
-  const list = resolveBlockedList(m, bd);
+  const list = resolveBlockedList(m, state.molRaw);
   const withCI = list.filter((r) => r.ci).length;
   const byCareer = {};
   for (const r of list) byCareer[r.dept] = (byCareer[r.dept] || 0) + 1;
@@ -290,21 +375,13 @@ function renderBlocked(m) {
   state._blockedList = list;
 }
 
+/* El bloque de admisiones («Nuevos inscritos») está fuera del alcance actual:
+   se quitó su panel y su zona de carga. El parser sigue en parse.js, así que
+   devolverlo es reponer el markup y volver a llamar a esto. */
 function renderAdmissions() {
-  const n = state.nuevos;
-  $('#admissions').hidden = !n;
-  if (!n) return;
-  $('#adm-total').textContent = fmtInt(n.total);
-  const maxCar = Math.max(1, ...n.byCareer.map((c) => c[1]));
-  $('#adm-careers').innerHTML = n.byCareer.map(([code, v]) => `
-    <div class="cbar">
-      <div class="cbar__id"><span class="cbar__code">${code}</span></div>
-      <div class="cbar__track"><span class="cbar__fill" style="--w:${(v / maxCar) * 100}%"></span></div>
-      <div class="cbar__val">${fmtInt(v)}</div>
-    </div>`).join('');
-  const maxMon = Math.max(1, ...n.byMonth.map((c) => c[1]));
-  $('#adm-months').innerHTML = n.byMonth.map(([mes, v]) => `
-    <div class="mbar"><span class="mbar__col" style="--h:${(v / maxMon) * 100}%"><b>${fmtInt(v)}</b></span><span class="mbar__lab">${mes.slice(0, 3)}</span></div>`).join('');
+  const el = document.querySelector('#admissions');
+  if (!el || !state.nuevos) return;
+  el.hidden = false;
 }
 
 /* ---------- tooltip de gráficos ----------
@@ -352,6 +429,7 @@ function initTooltip() {
 /* ---------- modal: gráficos ampliados ---------- */
 
 let lastFocus = null;
+/* Métrica de los mapas de calor del modal: 'ent' o 'sal'. */
 let heatMetric = 'ent';
 
 const rangeLabel = () =>
@@ -386,7 +464,7 @@ function heatMax(m) {
   let max = 1;
   for (const r of m.hourByDay) {
     for (let h = 0; h < 24; h++) {
-      const v = heatMetric === 'sal' ? r.sal[h] : heatMetric === 'total' ? r.ent[h] + r.sal[h] : r.ent[h];
+      const v = heatMetric === 'sal' ? r.sal[h] : r.ent[h];
       if (v > max) max = v;
     }
   }
@@ -403,7 +481,7 @@ function careersAtHour(m, hour) {
 
 function hourlyBody() {
   const m = state.mol;
-  const qué = heatMetric === 'sal' ? 'salidas' : heatMetric === 'total' ? 'pasajes (entradas + salidas)' : 'entradas';
+  const qué = heatMetric === 'sal' ? 'salidas' : 'entradas';
   const pico = m.hourEnt.indexOf(Math.max(...m.hourEnt));
   const enPico = careersAtHour(m, pico);
   const maxPico = Math.max(1, ...enPico.map((c) => c.n));
@@ -466,7 +544,7 @@ function openHourly() {
     'Afluencia por hora',
     `${rangeLabel()} · ${m.days.length} ${m.days.length === 1 ? 'día' : 'días'} × 24 horas`,
     hourlyBody(),
-    segmented([['ent', 'Entradas'], ['sal', 'Salidas'], ['total', 'Total']], heatMetric),
+    segmented([['ent', 'Entradas'], ['sal', 'Salidas']], heatMetric),
   );
   $$('#modal-controls button').forEach((b) => b.addEventListener('click', () => {
     heatMetric = b.dataset.v;
@@ -535,31 +613,51 @@ function openBlocked() {
       </div>`).join('')}</div>`);
 }
 
-function openAdmissions() {
-  const n = state.nuevos;
-  if (!n) return;
-  const maxCar = Math.max(1, ...n.byCareer.map((c) => c[1]));
-  const maxMon = Math.max(1, ...n.byMonth.map((c) => c[1]));
-  openModal('Nuevos inscritos', `${fmtInt(n.total)} inscritos · del archivo de admisiones, no depende del rango de fechas`, `
+function openRoster() {
+  const ros = state.mol?.roster;
+  if (!ros) return;
+  openModal('Quiénes vinieron',
+    `${rangeLabel()} · ${fmtPct(ros.tasa)} de asistencia · ${fmtInt(ros.asistieron)} de ${fmtInt(ros.activos)} estudiantes activos`, `
     <section class="modal__section">
-      <h3>Por carrera</h3>
-      <div class="bars">${n.byCareer.map(([code, v]) => `
+      <h3>Asistencia por carrera</h3>
+      <p class="panel__note">Qué porcentaje de los inscritos en cada carrera entró al menos una vez en el rango.</p>
+      <div class="bars">${ros.porCarrera.map((c) => `
         <div class="cbar">
-          <div class="cbar__id"><span class="cbar__code">${code}</span><span class="cbar__name">${careerName(code) === code ? '' : careerName(code)}</span></div>
-          <div class="cbar__track"><span class="cbar__fill" style="--w:${(v / maxCar) * 100}%"></span></div>
-          <div class="cbar__val">${fmtInt(v)}</div>
+          <div class="cbar__id"><span class="cbar__code">${c.code}</span><span class="cbar__name">${careerName(c.code) === c.code ? '' : careerName(c.code)}</span></div>
+          <div class="cbar__track"><span class="cbar__fill" style="--w:${(c.tasa * 100).toFixed(1)}%"></span></div>
+          <div class="cbar__val">${fmtPct(c.tasa)}<span class="cbar__sub">${fmtInt(c.vinieron)}/${fmtInt(c.total)}</span></div>
         </div>`).join('')}</div>
     </section>
     <section class="modal__section">
-      <h3>Por mes de inscripción</h3>
-      <div class="months">${n.byMonth.map(([mes, v]) => `
-        <div class="mbar"><span class="mbar__col" style="--h:${(v / maxMon) * 100}%"><b>${fmtInt(v)}</b></span><span class="mbar__lab">${mes.slice(0, 3)}</span></div>`).join('')}</div>
+      <h3>Detalle por carrera</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Código</th><th>Carrera</th><th class="num">Inscritos</th><th class="num">Vinieron</th><th class="num">Sin registro</th><th class="num">Asistencia</th></tr></thead>
+          <tbody>${ros.porCarrera.map((c) => `
+            <tr><td>${c.code}</td><td>${careerName(c.code) === c.code ? '—' : careerName(c.code)}</td>
+            <td class="num">${fmtInt(c.total)}</td><td class="num">${fmtInt(c.vinieron)}</td>
+            <td class="num">${fmtInt(c.faltan)}</td><td class="num">${fmtPct(c.tasa)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="modal__section">
+      <h3>Sin registro en el rango <span class="tally">${fmtInt(ros.ausentes)}</span></h3>
+      <p class="panel__note">Inscritos que no pasaron por ningún molinete en estas fechas.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Carrera</th><th>Apellidos</th><th>Nombres</th><th class="num">CI</th></tr></thead>
+          <tbody>${ros.ausentesList.map((r) => `
+            <tr><td>${r.carrera}</td><td>${r.ap} ${r.am}</td><td>${r.no}</td><td class="num">${r.ci || '—'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
     </section>`);
 }
 
 const CHART_OPENERS = {
   hourly: openHourly, daily: openDaily, careers: openCareers,
-  blocked: openBlocked, admissions: openAdmissions,
+  blocked: openBlocked, roster: openRoster,
 };
 
 function initModal() {
@@ -584,11 +682,9 @@ function initModal() {
 
 /* ---------- export ---------- */
 
-function exportBlocked() {
-  const list = state._blockedList || [];
+/* CSV con BOM y «;» — es lo que abre bien el Excel en es-BO sin asistente. */
+function downloadCSV(name, head, rows) {
   const period = state.from ? `${state.from}_a_${state.to}` : 'periodo';
-  const head = ['Carrera', 'Apellidos', 'Nombres', 'CI'];
-  const rows = list.map((r) => [r.dept, r.apellido, r.nombre, r.ci]);
   const esc = (v) => {
     const s = String(v ?? '');
     return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -597,9 +693,23 @@ function exportBlocked() {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `bloqueados_deuda_${period}.csv`;
+  a.download = `${name}_${period}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function exportBlocked() {
+  const list = state._blockedList || [];
+  downloadCSV('bloqueados_deuda', ['Carrera', 'Apellidos', 'Nombres', 'CI'],
+    list.map((r) => [r.dept, r.apellido, r.nombre, r.ci]));
+}
+
+/* Padrón: los que NO aparecieron en el rango. Sale con Código y CI para poder
+   pegarlo contra cualquier otro sistema de la universidad. */
+function exportAbsent() {
+  const list = state._absentList || [];
+  downloadCSV('sin_registro', ['Carrera', 'Código', 'CI', 'Apellidos', 'Nombres'],
+    list.map((r) => [r.carrera, r.cod, r.ci, `${r.ap} ${r.am}`.trim(), r.no]));
 }
 
 /* ---------- motion (un solo momento orquestado) ---------- */
@@ -626,17 +736,6 @@ function countUp(el) {
     else el.textContent = raw;
   };
   requestAnimationFrame(tick);
-}
-
-/* ---------- tema ---------- */
-
-function initTheme() {
-  const btn = $('#theme-toggle');
-  const apply = (t) => { document.documentElement.dataset.theme = t; btn.setAttribute('aria-pressed', String(t === 'dark')); };
-  btn.addEventListener('click', () => {
-    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('theme', next); apply(next);
-  });
 }
 
 /* ---------- wiring ---------- */
@@ -669,6 +768,7 @@ function initBlockedToggle() {
     btn.setAttribute('aria-expanded', String(open));
   });
   $('#blocked-export').addEventListener('click', exportBlocked);
+  $('#roster-export')?.addEventListener('click', exportAbsent);
 }
 
 initTheme();
@@ -678,3 +778,4 @@ initModal();
 initTooltip();
 initBlockedToggle();
 renderAll();
+cargarReferencias();

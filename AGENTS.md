@@ -8,6 +8,16 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+## Rutas
+
+- `/` redirige a `/principal` — el informe. Única zona de carga: el export de molinetes.
+- `/registrar` — administra los archivos de referencia (BD de estudiantes, padrón del ZKTeco).
+- `/api/archivos` (GET/POST) y `/api/archivos/:tipo` (GET) — registro de archivos, en `src/lib/archivos.js`.
+
+El proyecto usa el adaptador `@astrojs/node`: las páginas son estáticas y solo los endpoints
+corren en el servidor (`export const prerender = false`). Los archivos registrados se guardan en
+`archives/`, o donde apunte `ARCHIVES_DIR`.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
