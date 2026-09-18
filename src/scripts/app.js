@@ -222,7 +222,6 @@ function renderAll() {
   renderPeakCareers(m);
   $('#chart-daily').innerHTML = dailyTrend(m.days, m.perDayEntradas, { salidas: m.perDaySalidas });
   renderCareers(m);
-  renderRoster(m);
   renderBlocked(m);
   renderAdmissions();
   playReveal();
@@ -317,34 +316,6 @@ function renderCareerCoverage() {
   const el = $('#careers-coverage');
   if (!el) return;
   el.textContent = state.bd ? '' : 'Carga la BD de estudiantes para desglosar por carrera.';
-}
-
-/* ---------- padrón del rango ----------
-   Quién vino y quién no. El archivo de eventos cubre solo las fechas pedidas al
-   exportar, así que la ausencia es un dato normal — no un error de cruce — y el
-   informe tiene que decirlo con todas las letras para que nadie lo lea como un
-   fallo del cruce de nombres. */
-function renderRoster(m) {
-  const ros = m.roster;
-  const sec = $('#roster');
-  if (!sec) return;
-  sec.hidden = !ros;
-  if (!ros) return;
-
-  $('#roster-attended').textContent = fmtInt(ros.asistieron);
-  $('#roster-active').textContent = fmtInt(ros.activos);
-  $('#roster-rate').textContent = fmtPct(ros.tasa);
-
-  /* La barra es el PORCENTAJE, no el conteo: así se comparan carreras de
-     tamaños muy distintos. En crudo, MED (762 inscritos) tapaba a todas. */
-  $('#roster-careers').innerHTML = ros.porCarrera.map((c) => `
-    <div class="cbar">
-      <div class="cbar__id"><span class="cbar__code">${c.code}</span><span class="cbar__name">${careerName(c.code) === c.code ? '' : careerName(c.code)}</span></div>
-      <div class="cbar__track"><span class="cbar__fill" style="--w:${(c.tasa * 100).toFixed(1)}%"></span></div>
-      <div class="cbar__val">${fmtPct(c.tasa)}<span class="cbar__sub">${fmtInt(c.vinieron)}/${fmtInt(c.total)}</span></div>
-    </div>`).join('');
-
-  state._absentList = ros.ausentesList;
 }
 
 function renderBlocked(m) {
@@ -613,51 +584,9 @@ function openBlocked() {
       </div>`).join('')}</div>`);
 }
 
-function openRoster() {
-  const ros = state.mol?.roster;
-  if (!ros) return;
-  openModal('Quiénes vinieron',
-    `${rangeLabel()} · ${fmtPct(ros.tasa)} de asistencia · ${fmtInt(ros.asistieron)} de ${fmtInt(ros.activos)} estudiantes activos`, `
-    <section class="modal__section">
-      <h3>Asistencia por carrera</h3>
-      <p class="panel__note">Qué porcentaje de los inscritos en cada carrera entró al menos una vez en el rango.</p>
-      <div class="bars">${ros.porCarrera.map((c) => `
-        <div class="cbar">
-          <div class="cbar__id"><span class="cbar__code">${c.code}</span><span class="cbar__name">${careerName(c.code) === c.code ? '' : careerName(c.code)}</span></div>
-          <div class="cbar__track"><span class="cbar__fill" style="--w:${(c.tasa * 100).toFixed(1)}%"></span></div>
-          <div class="cbar__val">${fmtPct(c.tasa)}<span class="cbar__sub">${fmtInt(c.vinieron)}/${fmtInt(c.total)}</span></div>
-        </div>`).join('')}</div>
-    </section>
-    <section class="modal__section">
-      <h3>Detalle por carrera</h3>
-      <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Código</th><th>Carrera</th><th class="num">Inscritos</th><th class="num">Vinieron</th><th class="num">Sin registro</th><th class="num">Asistencia</th></tr></thead>
-          <tbody>${ros.porCarrera.map((c) => `
-            <tr><td>${c.code}</td><td>${careerName(c.code) === c.code ? '—' : careerName(c.code)}</td>
-            <td class="num">${fmtInt(c.total)}</td><td class="num">${fmtInt(c.vinieron)}</td>
-            <td class="num">${fmtInt(c.faltan)}</td><td class="num">${fmtPct(c.tasa)}</td></tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section class="modal__section">
-      <h3>Sin registro en el rango <span class="tally">${fmtInt(ros.ausentes)}</span></h3>
-      <p class="panel__note">Inscritos que no pasaron por ningún molinete en estas fechas.</p>
-      <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Carrera</th><th>Apellidos</th><th>Nombres</th><th class="num">CI</th></tr></thead>
-          <tbody>${ros.ausentesList.map((r) => `
-            <tr><td>${r.carrera}</td><td>${r.ap} ${r.am}</td><td>${r.no}</td><td class="num">${r.ci || '—'}</td></tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </section>`);
-}
-
 const CHART_OPENERS = {
   hourly: openHourly, daily: openDaily, careers: openCareers,
-  blocked: openBlocked, roster: openRoster,
+  blocked: openBlocked,
 };
 
 function initModal() {
@@ -702,14 +631,6 @@ function exportBlocked() {
   const list = state._blockedList || [];
   downloadCSV('bloqueados_deuda', ['Carrera', 'Apellidos', 'Nombres', 'CI'],
     list.map((r) => [r.dept, r.apellido, r.nombre, r.ci]));
-}
-
-/* Padrón: los que NO aparecieron en el rango. Sale con Código y CI para poder
-   pegarlo contra cualquier otro sistema de la universidad. */
-function exportAbsent() {
-  const list = state._absentList || [];
-  downloadCSV('sin_registro', ['Carrera', 'Código', 'CI', 'Apellidos', 'Nombres'],
-    list.map((r) => [r.carrera, r.cod, r.ci, `${r.ap} ${r.am}`.trim(), r.no]));
 }
 
 /* ---------- motion (un solo momento orquestado) ---------- */
@@ -768,7 +689,6 @@ function initBlockedToggle() {
     btn.setAttribute('aria-expanded', String(open));
   });
   $('#blocked-export').addEventListener('click', exportBlocked);
-  $('#roster-export')?.addEventListener('click', exportAbsent);
 }
 
 initTheme();

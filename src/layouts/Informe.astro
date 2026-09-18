@@ -323,8 +323,6 @@ const { titulo } = Astro.props;
       .cbar__fill { display: block; height: 100%; width: var(--w); background: var(--accent); border-radius: 999px; transform-origin: left; animation: grow .7s cubic-bezier(.2,.8,.2,1) both; }
       .cbar--alert .cbar__fill { background: var(--alert); }
       .cbar__val { font-weight: 600; font-size: .86rem; min-width: 44px; text-align: right; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
-      /* Conteo crudo junto a un valor que es porcentaje: «68%  15/22». */
-      .cbar__sub { font-size: .72rem; font-weight: 500; color: var(--muted); min-width: 52px; text-align: right; }
       .cbar__deny { font-size: .72rem; font-weight: 700; color: var(--alert); background: var(--alert-soft); padding: 1px 7px; border-radius: 999px; }
       @keyframes grow { from { transform: scaleX(0); } }
       .cbar:nth-child(2) .cbar__fill { animation-delay: .03s; }

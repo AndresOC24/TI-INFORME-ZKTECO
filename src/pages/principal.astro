@@ -7,7 +7,7 @@ import Informe from '../layouts/Informe.astro';
 
   <a slot="acciones" class="navlink" href="/registrar">
     <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="3"/><path d="M4.5 5.5v13c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-13"/><path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/></svg>
-    Archivos de referencia
+    Archivos
   </a>
 
       <main class="wrap">
@@ -88,22 +88,6 @@ import Informe from '../layouts/Informe.astro';
             <div id="careers" class="bars"></div>
           </section>
 
-          <section class="panel" id="roster" aria-label="Padrón del rango" hidden>
-            <div class="panel__head">
-              <h2>Quiénes vinieron <span id="roster-rate" class="tally tally--accent">0%</span></h2>
-              <button class="expand" type="button" data-chart="roster" title="Ampliar" aria-label="Ampliar padrón del rango">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
-              </button>
-            </div>
-            <p class="panel__note">De los <b id="roster-active">0</b> estudiantes activos de la gestión, <b id="roster-attended">0</b> pasaron por un molinete en estas fechas. Cada barra es el <b>porcentaje de asistencia de esa carrera</b>: cuántos de sus inscritos vinieron.</p>
-            <div id="roster-careers" class="bars"></div>
-            <div class="blocked__actions">
-              <button id="roster-export" class="btn btn--ghost" type="button">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 21h16"/></svg>
-                Exportar sin registro
-              </button>
-            </div>
-          </section>
 
           <section class="panel panel--alert" aria-label="Bloqueados por deuda">
             <div class="panel__head">

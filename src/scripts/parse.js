@@ -464,62 +464,24 @@ export function aggregate(parsed, fromDay, toDay, bd) {
     blockedCount: blocked.size,
     /* personas contadas y personas descartadas por no pertenecer a la gestión */
     careerCoverage: { students: seen.size, excluidos: excluidos.size },
-    /* padrón del rango: quién de la BD vino y quién no (ver `roster`) */
+    /* asistencia del rango contra los activos de la BD (ver `roster`) */
     roster: roster(parsed, bd, seenCodes),
   };
 }
 
-/* ---------- padrón del rango ----------
+/* ---------- asistencia del rango ----------
 
-   El archivo de eventos cubre solo las fechas que se pidieron al exportar, así
-   que un estudiante que no aparece casi nunca es un error de cruce: es alguien
-   que no vino en esas fechas. Separar las dos cosas es lo que hace legible el
-   informe, y es la razón de esta función:
+   Cuántos de los estudiantes activos de la gestión entraron en el rango. Es lo
+   que alimenta el dato grande del resumen («Asistencia del período»).
 
-     · asistieron  — activos de la BD vistos en el rango
-     · ausentes    — activos de la BD que NO aparecen (no vinieron)
-     · noActivos   — personas vistas en el molinete que no están en la BD de la
-                     gestión (egresados, retirados, arrastres del padrón)
-
-   «ausentes» es información, no un fallo. «noActivos» tampoco: son gente real
-   que pasó por la puerta pero que no cuenta como estudiante de la gestión. */
+   El denominador son los activos de la BD, no las personas vistas en el
+   molinete: por la puerta también pasa gente que ya no está inscrita, y
+   meterla en la cuenta inflaba la tasa. */
 function roster(parsed, bd, seenCodes) {
   if (!bd) return null;
-  const seenPeople = new Set();
-  for (const id of parsed.names.keys()) seenPeople.add(id);
-
-  const ausentes = [];
-  for (const st of bd.students) {
-    if (!seenCodes.has(st.cod)) ausentes.push(st);
-  }
-  const ausentesByCareer = new Map();
-  for (const st of ausentes) {
-    ausentesByCareer.set(st.carrera, (ausentesByCareer.get(st.carrera) || 0) + 1);
-  }
-
-  /* Asistencia POR CARRERA: cuántos de los inscritos en cada carrera vinieron.
-     Es una tasa, no un conteo, justamente para poder comparar carreras de
-     tamaños muy distintos — MED tiene 762 inscritos y GAC 22, así que en
-     números crudos MED gana siempre y no se ve quién asiste mejor. */
-  const totalPorCarrera = new Map();
-  for (const st of bd.students) {
-    totalPorCarrera.set(st.carrera, (totalPorCarrera.get(st.carrera) || 0) + 1);
-  }
-  const porCarrera = [...totalPorCarrera.entries()]
-    .map(([code, total]) => {
-      const faltan = ausentesByCareer.get(code) || 0;
-      const vinieron = total - faltan;
-      return { code, total, vinieron, faltan, tasa: total ? vinieron / total : 0 };
-    })
-    .sort((a, b) => b.tasa - a.tasa || b.total - a.total);
-
   return {
     activos: bd.total,
     asistieron: seenCodes.size,
-    ausentes: ausentes.length,
-    ausentesList: ausentes,
-    ausentesByCareer: [...ausentesByCareer.entries()].sort((a, b) => b[1] - a[1]),
-    porCarrera,
     tasa: bd.total ? seenCodes.size / bd.total : 0,
   };
 }
