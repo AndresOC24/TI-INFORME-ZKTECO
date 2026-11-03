@@ -25,9 +25,9 @@ No es el software genérico de ZKTeco ni una planilla de Excel: toma la exportac
 ## Operating Context
 
 - Los dispositivos ZKTeco (molinetes en puertas, identificados por IP, p. ej. `192.168.5.111`) controlan el ingreso físico; un estudiante **bloqueado por deuda** no puede pasar. El estado de bloqueo vive en la base de estudiantes (`Deuda Molinete`), no en el log del molinete.
-- El personal de TI **exporta manualmente** los archivos y los usa como fuente. No hay conexión en vivo a API/SDK ni base de datos intermedia (a la fecha); lo único que persiste el servidor son los dos archivos de referencia que se registran en `/registrar`.
+- El personal de TI **exporta manualmente** los archivos y los usa como fuente. No hay conexión en vivo a API/SDK ni base de datos intermedia; el servidor conserva la BD de estudiantes, el padrón ZKTeco y el directorio docente registrados en `/registrar`.
 - El consumo es de **revisión/análisis**: leer el resumen, no editar registros.
-- El log de molinetes registra **solo eventos de "Entrada"** y de **Salida**, e incluye no solo estudiantes sino también `VISITA`, `DOCENTE` y `ADMINISTRATIVOS` los cuales estos ultimos 3 se deben de excluir para el resumen final, solo se debe de tomar en cuenta a los Estudiantes, que son todos aquellos que tienen en nombre del departamento lo siguiente: ADM, AHT, ARQ, BYF, CPU, DER, DGP, ENF, GAC, ICO, MED, ODO, PER, PSI, PYM, SIS.
+- El log incluye entradas, salidas y accesos denegados de varias poblaciones. El resumen **Estudiantes** mantiene su filtro estudiantil; la opción **Docentes** presenta el directorio y sus marcaciones por separado. Ambas vistas comparten el archivo cargado y el rango de fechas.
 - Existe 4 molinetes identificados con 4 tipos de direcciones diferentes las cuales son: 192.168.5.106, 192.168.5.110, 192.168.5.111, 192.168.5.112. Cada una de ella luego tiene una denominacion de un -1, -2, -3, o hasta -4, luego todos tiene Entrada o Salida, exepto uno, que es la 192.168.5.106, en esta la que dice 192.168.5.106-1 se la considera Entrada, y 192.168.5.106-2 se la considera Salida.
 
 ## Capabilities and Constraints
@@ -97,7 +97,16 @@ Cuatro archivos reales en `archives/` (verificados contra el export de septiembr
 - **Métricas objetivo:** volumen total (entradas/salidas únicas del período) como dato protagonista; **tasa de asistencia** (entrantes únicos ÷ total de estudiantes activos de la BD, por día y del período); afluencia por hora; desglose por carrera; bloqueados por deuda (conteo + listado); y **nuevos inscritos** (total y por carrera/mes) cuando se cargue ese archivo.
 - **Degradación por disponibilidad:** con solo el export de molinetes el informe funciona (flujo, afluencia, denegaciones); la **carrera, el CI y la tasa de asistencia** aparecen cuando está registrada la `BD de estudiantes`; el **cruce por CI** (y con él la mejor cobertura) cuando está el `padrón del ZKTeco`. La línea de estado bajo la zona de carga dice siempre qué hay y qué falta.
 - **Identidad de persona:** dentro del archivo de molinetes, `ID` (numérico interno del dispositivo) identifica de forma estable a cada persona; se usa para deduplicar por día y por período. No se requiere cruzar con la BD (el `ID` del molinete no coincide con el `Código`/`Carnet` académico, pero eso es irrelevante para el alcance resuelto).
-- **Idioma:** español. **Backend mínimo:** solo guarda y devuelve los dos archivos de referencia; no hay base de datos ni conexión en vivo al ZKTeco, y todo el cálculo del informe sigue ocurriendo en el navegador.
+- **Idioma:** español. **Backend mínimo:** guarda y devuelve los tres archivos de referencia; no hay base de datos ni conexión en vivo al ZKTeco, y todo el cálculo del informe sigue ocurriendo en el navegador.
+
+### Directorio y registros de docentes
+
+- `DOCENTES.xlsx` contiene 274 filas con datos en su hoja principal, equivalentes a **273 CI distintos**. La hoja auxiliar repite el listado. La copia registrada elimina filas vacías de formato y conserva los datos originales de la hoja principal.
+- El directorio muestra nombre, CI, carreras, teléfono, correo y condición antiguo/nuevo incluso sin export de molinetes. La búsqueda admite nombre, CI e ID ZKTeco; se puede filtrar por carrera y situación del período y exportar el listado filtrado a CSV.
+- El cruce prioriza CI del padrón y después nombre canónico sin tildes ni dependencia del orden. Los homónimos requieren CI; los CI repetidos se unifican y conservan sus carreras. Un docente identificado por el directorio se reconoce aunque su departamento esté mal registrado en el molinete.
+- Las personas con rol DOCENTE sin coincidencia quedan identificadas como tales y conservan el nombre del evento; no se inventan carrera ni datos de contacto.
+- La ficha detalla fecha, hora, dirección, punto e ID de cada marcación. Las entradas y salidas cuentan pasajes; los días con entrada se deduplican por persona. Los eventos «Deshabilitada» cuentan aparte como acceso denegado, sin atribuirlo a deuda.
+- «Sin entrada registrada» no significa ausencia ni incumplimiento de horario: solo describe el export y rango seleccionados.
 
 ## Brand Commitments
 

@@ -83,8 +83,10 @@ export function readHeader(arrayBuffer) {
   return XLSX.read(arrayBuffer, { sheetRows: 12 });
 }
 
-function sheetRows(ws) {
-  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+function sheetRows(ws, limit) {
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  if (limit) range.e.r = Math.min(range.e.r, range.s.r + limit - 1);
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false, range });
 }
 
 function findHeaderRow(rows, needles) {
@@ -170,7 +172,7 @@ function direction(punto) {
    recalcular el informe para cualquier rango de fechas sin releer el archivo
    (ver `aggregate`). Un evento: { day, hour, id, dir } con
    dir = 'E' entrada · 'S' salida · 'X' intento denegado (Deshabilitada). */
-export function parseMolinetes(wb) {
+export function parseMolinetes(wb, { allRoles = false } = {}) {
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = sheetRows(ws);
   const hr = findHeaderRow(rows, ['Tiempo', 'Punto del Evento', 'ID']);
@@ -193,7 +195,7 @@ export function parseMolinetes(wb) {
     if (!row || !row.length) continue;
     const dept = String(row[cDept] || '').trim();
     const legacyCareer = STUDENT_SET.has(dept);
-    if (dept !== STUDENT_ROLE && !legacyCareer) continue;   // solo estudiantes
+    if (!allRoles && dept !== STUDENT_ROLE && !legacyCareer) continue;
     const t = parseTime(row[cTime]);
     if (!t) continue;
 
@@ -213,7 +215,11 @@ export function parseMolinetes(wb) {
       names.set(id, { nombre: String(row[cNom] || '').trim(), apellido: String(row[cApe] || '').trim() });
     }
     if (legacyCareer) careerById.set(id, canonCareer(dept));   // export viejo: la carrera ya venía
-    events.push({ day: t.day, hour: t.hour, id, dir });
+    const clock = String(row[cTime]).match(/(?: |T)(\d{1,2}:\d{2}(?::\d{2})?)/);
+    events.push({ day: t.day, hour: t.hour, id, dir,
+      time: clock ? clock[1].split(':').map(p => p.padStart(2, '0')).join(':') : `${String(t.hour).padStart(2, '0')}:00`,
+      department: dept, point: String(row[cPunto] || '').trim(),
+    });
     dayset.add(t.day);
   }
 
@@ -652,10 +658,21 @@ export function resolveBlockedList(molinetes, parsed) {
 /* Detección de tipo de archivo por contenido (para aceptar cualquiera en
    cualquier zona y avisar si el usuario suelta el equivocado). */
 export function detectKind(wb) {
-  const rows = sheetRows(wb.Sheets[wb.SheetNames[0]]);
+  const rows = sheetRows(wb.Sheets[wb.SheetNames[0]], 12);
   if (findHeaderRow(rows, ['Tiempo', 'Punto del Evento', 'ID']) !== -1) return 'molinetes';
   if (findHeaderRow(rows, ['ID', 'Documento / Cédula']) !== -1) return 'usuarios';
   if (findHeaderRow(rows, ['CÓDIGO ESTUDIANTE', 'CARRERA']) !== -1) return 'nuevos';
   if (findHeaderRow(rows, ['Carrera', 'Código']) !== -1) return 'bd';
+  if (docenteHeader(rows) !== -1) return 'docentes';
   return 'desconocido';
 }
+
+export function docenteHeader(rows) {
+  return rows.slice(0, 12).findIndex((row) => {
+    const cells = row.map(normName);
+    return cells.includes('CI') && cells.includes('CARRERA') && cells.some(isDocenteNameHeader);
+  });
+}
+
+export const isDocenteNameHeader = (value) => /^(?:\d+ )?DOCENTES?(?: G.*)?$/.test(value)
+  || ['NOMBRE COMPLETO', 'NOMBRES Y APELLIDOS'].includes(value);

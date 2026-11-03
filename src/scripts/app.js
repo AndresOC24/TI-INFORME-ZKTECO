@@ -4,16 +4,21 @@ import {
 } from './parse.js';
 import { hourlyChart, dailyTrend, hourHeatmap, heatmapLegend, dayLabel, fmtInt, fmtPct } from './charts.js';
 import { initTheme } from './theme.js';
+import { parseDocentes, linkDocentes, aggregateDocentes } from './docentes-data.js';
+import { initDocentesView } from './docentes-view.js';
 
 /* molRaw = eventos crudos del archivo; mol = métricas del rango seleccionado.
    usuarios = padrón del ZKTeco, el puente entre el ID del molinete y el CI. */
-const state = { molRaw: null, mol: null, bd: null, usuarios: null, nuevos: null, from: null, to: null };
+const state = { molRaw: null, allRaw: null, mol: null, bd: null, usuarios: null, docentes: null,
+  docenteLinks: new Map(), teacherRows: [], mode: 'students', loadingReferences: true,
+  nuevos: null, from: null, to: null };
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 const KIND_LABEL = {
   molinetes: 'Registro de molinetes', bd: 'BD de estudiantes',
   usuarios: 'Usuarios del ZKTeco', nuevos: 'Nuevos inscritos',
+  docentes: 'Directorio de docentes',
 };
 
 const MESES = {
@@ -33,6 +38,7 @@ function humanDate(day) {
 const OTRO_SITIO = {
   bd: 'la BD de estudiantes',
   usuarios: 'el padrón de usuarios del ZKTeco',
+  docentes: 'el directorio de docentes',
 };
 
 async function handleFiles(fileList, hintKind) {
@@ -52,10 +58,14 @@ async function handleFiles(fileList, hintKind) {
       }
 
       state.molRaw = parseMolinetes(wb);
+      state.allRaw = parseMolinetes(wb, { allRoles: true });
+      // Un rango comun permite alternar de poblacion sin perder las fechas.
+      for (const key of ['minDay', 'maxDay', 'daysWithData']) state.molRaw[key] = state.allRaw[key];
+      state.docenteLinks = linkDocentes(state.allRaw, state.docentes, state.usuarios);
       state.from = state.molRaw.minDay;              // rango inicial = todo el archivo
       state.to = state.molRaw.maxDay;
       recompute();
-      setZoneState(hintKind, 'done', `${fmtInt(state.mol.entradasUnicas)} ingresos únicos`, file.name);
+      setZoneState(hintKind, 'done', `${fmtInt(state.allRaw.events.length)} marcaciones cargadas`, file.name);
       renderAll();
     } catch (err) {
       console.error(err);
@@ -84,6 +94,8 @@ async function cargarReferencias() {
       linea.className = 'fuentes fuentes--err';
       linea.textContent = `No se pudieron cargar los archivos de referencia (${err.message}). El informe se calcula igual, sin carrera ni CI.`;
     }
+    state.loadingReferences = false;
+    renderAll();
     return;
   }
 
@@ -102,6 +114,9 @@ async function cargarReferencias() {
 
   await traer('bd', parseBD, (v) => { state.bd = v; });
   await traer('usuarios', parseUsuarios, (v) => { state.usuarios = v; });
+  await traer('docentes', parseDocentes, (v) => { state.docentes = v; });
+  state.loadingReferences = false;
+  state.docenteLinks = linkDocentes(state.allRaw, state.docentes, state.usuarios);
 
   recompute();
   renderFuentes();
@@ -114,6 +129,7 @@ function renderFuentes() {
   const partes = [];
   if (state.bd) partes.push(`BD · ${fmtInt(state.bd.total)} activos`);
   if (state.usuarios) partes.push(`padrón ZKTeco · ${fmtInt(state.usuarios.total)} usuarios`);
+  if (state.docentes) partes.push(`directorio · ${fmtInt(state.docentes.total)} docentes`);
 
   if (!partes.length) {
     linea.className = 'fuentes fuentes--err';
@@ -121,7 +137,8 @@ function renderFuentes() {
       + '<a href="/registrar">Registrarlos</a>.';
     return;
   }
-  const faltan = !state.bd ? 'falta la BD de estudiantes'
+  const faltan = state.mode === 'teachers' && !state.docentes ? 'falta el directorio de docentes'
+    : state.mode === 'students' && !state.bd ? 'falta la BD de estudiantes'
     : !state.usuarios ? 'falta el padrón del ZKTeco (el cruce por CI queda fuera)' : '';
   linea.className = 'fuentes';
   linea.innerHTML = `${partes.join(' · ')}${faltan ? ` · <b>${faltan}</b>` : ''} `
@@ -142,6 +159,7 @@ function setZoneStateEl(el, st, msg, name) {
 
 /* Recalcula todo el informe desde los eventos ya parseados: no relee el Excel. */
 function recompute() {
+  state.teacherRows = aggregateDocentes(state.allRaw, state.docentes, state.docenteLinks, state.from, state.to);
   if (!state.molRaw) { state.mol = null; return; }
   linkStudents(state.molRaw, state.bd, state.usuarios);
   state.mol = aggregate(state.molRaw, state.from, state.to, state.bd);
@@ -149,7 +167,7 @@ function recompute() {
 
 function setRange(from, to) {
   const raw = state.molRaw;
-  if (!raw) return;
+  if (!raw?.minDay) return;
   const clamp = (d) => (d < raw.minDay ? raw.minDay : d > raw.maxDay ? raw.maxDay : d);
   let a = clamp(from || raw.minDay);
   let b = clamp(to || raw.maxDay);
@@ -181,13 +199,16 @@ function syncRange() {
   const full = isFullRange();
   $('#range-all').disabled = full;
   $('#range-7').disabled = raw.daysWithData.length <= 7;
-  const nd = state.mol ? state.mol.days.length : 0;
+  const nd = state.mode === 'teachers'
+    ? new Set(state.teacherRows.flatMap(row => row.events.map(e => e.day))).size
+    : state.mol ? state.mol.days.length : 0;
   $('#range-info').innerHTML =
     `<b>${fmtInt(nd)}</b> ${nd === 1 ? 'día' : 'días'} con registros`
     + (full ? ' · todo el archivo' : ` · el archivo abarca ${humanDate(raw.minDay)} – ${humanDate(raw.maxDay)}`);
 }
 
 function renderPeriod() {
+  if (!state.from) { $('#period').textContent = 'El archivo no contiene marcaciones con fecha válida'; return; }
   const line = state.from === state.to
     ? `Datos del <strong>${humanDate(state.from)}</strong>`
     : `Del <strong>${humanDate(state.from)}</strong> al <strong>${humanDate(state.to)}</strong>`;
@@ -198,12 +219,26 @@ function renderPeriod() {
 
 function renderAll() {
   const raw = state.molRaw;
-  $('#empty').hidden = !!raw;
+  const teachers = state.mode === 'teachers';
+  $('#mode-students').setAttribute('aria-pressed', String(!teachers));
+  $('#mode-teachers').setAttribute('aria-pressed', String(teachers));
+  $('#teachers-view').hidden = !teachers;
+  $('#empty').hidden = !!raw || teachers;
   $('#report').hidden = !raw;
-  if (!raw) return;
+  renderTeachers(state.teacherRows, state.docentes, !!state.allRaw, state.loadingReferences);
+  if (!raw) {
+    $('#period').textContent = teachers ? 'Directorio de docentes · carga el XLS para ver marcaciones' : 'Carga un archivo para comenzar';
+    return;
+  }
 
   syncRange();
   renderPeriod();
+  for (const control of ['#range-from', '#range-to']) $(control).disabled = !raw.minDay;
+  if (teachers) {
+    $('#range-empty').hidden = true;
+    $('#report-body').hidden = true;
+    return;
+  }
 
   const m = state.mol;
   const sinDatos = !m || m.days.length === 0;
@@ -615,7 +650,8 @@ function initModal() {
 function downloadCSV(name, head, rows) {
   const period = state.from ? `${state.from}_a_${state.to}` : 'periodo';
   const esc = (v) => {
-    const s = String(v ?? '');
+    let s = String(v ?? '');
+    if (/^[=+@\-\t\r]/.test(s)) s = "'" + s;
     return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = '﻿' + [head, ...rows].map((r) => r.map(esc).join(';')).join('\r\n');
@@ -692,6 +728,9 @@ function initBlockedToggle() {
 }
 
 initTheme();
+const renderTeachers = initDocentesView(downloadCSV);
+$('#mode-students').addEventListener('click', () => { state.mode = 'students'; renderFuentes(); renderAll(); });
+$('#mode-teachers').addEventListener('click', () => { state.mode = 'teachers'; renderFuentes(); renderAll(); });
 initDropzones();
 initRange();
 initModal();

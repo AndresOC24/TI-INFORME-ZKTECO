@@ -2,6 +2,26 @@
 
 Aplicacion Astro para analizar archivos de acceso ZKTeco.
 
+## Estudiantes y docentes
+
+En `/principal`, las opciones **Estudiantes** y **Docentes** usan el mismo archivo
+de molinetes y conservan el rango de fechas al alternar. El directorio docente
+se puede consultar antes de cargar eventos: incluye nombre, CI, carrera,
+telefono, correo y condicion antiguo/nuevo. La ficha muestra entradas, salidas,
+accesos denegados y el detalle de las marcaciones del periodo.
+
+`DOCENTES.xlsx` se registra en `/registrar`, junto con la BD de estudiantes y el
+padron del ZKTeco. Se reconoce por las columnas de nombre de docente, CI y
+CARRERA. Los CI repetidos se unifican y los nombres ambiguos requieren cruce por
+CI. Los eventos con rol DOCENTE sin coincidencia se muestran como tales; no se
+inventan datos de contacto ni se interpreta la falta de entradas como ausencia.
+
+El archivo original queda en la raiz del proyecto. La copia registrada inicial
+en `archives/DOCENTES.xlsx` conserva las filas con datos de la hoja principal,
+sin las filas vacias de formato ni la hoja auxiliar repetida.
+
+Pruebas del procesamiento: `npm test`.
+
 ## Acceso desde la red con Laragon
 
 URL: http://192.168.14.100:9091

@@ -1,8 +1,9 @@
 ---
 import Informe from '../layouts/Informe.astro';
+import Docentes from '../components/Docentes.astro';
 ---
 
-<Informe titulo="Informe de acceso estudiantil">
+<Informe titulo="Informe de acceso">
   <p slot="subtitulo" id="period" class="period">Carga un archivo para comenzar</p>
 
   <a slot="acciones" class="navlink" href="/registrar">
@@ -11,6 +12,11 @@ import Informe from '../layouts/Informe.astro';
   </a>
 
       <main class="wrap">
+        <nav class="population-switch" aria-label="Tipo de registros">
+          <button id="mode-students" class="btn" type="button" aria-pressed="true">Estudiantes</button>
+          <button id="mode-teachers" class="btn" type="button" aria-pressed="false">Docentes</button>
+          <p>Un mismo archivo de molinetes para consultar ambos registros.</p>
+        </nav>
         <section class="uploads uploads--solo" aria-label="Cargar archivo de eventos">
           <label class="drop" data-kind="molinetes" data-state="idle">
             <input class="drop__input" type="file" accept=".xls,.xlsx,.csv" hidden />
@@ -28,7 +34,7 @@ import Informe from '../layouts/Informe.astro';
         <section id="empty" class="empty">
           <svg class="empty__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
           <h2>Carga el registro de molinetes para generar el informe</h2>
-          <p>Todo se procesa en tu navegador. El período se calcula automáticamente a partir de las fechas del archivo generado por el Zkteco. La BD de estudiantes y el padrón del ZKTeco se toman de los archivos registrados en el servidor: no hace falta volver a subirlos.</p>
+          <p>El archivo de molinetes se procesa en tu navegador. Alterna entre estudiantes y docentes sin volver a cargarlo. Los directorios y el padrón del ZKTeco se toman de los archivos registrados en el servidor.</p>
         </section>
 
         <div id="report" hidden>
@@ -119,6 +125,7 @@ import Informe from '../layouts/Informe.astro';
           </section>
           </div>
         </div>
+        <Docentes />
       </main>
 
       <div id="modal" class="modal" hidden>

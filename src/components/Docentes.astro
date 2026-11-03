@@ -1,0 +1,68 @@
+<section id="teachers-view" hidden aria-label="Registros de docentes">
+  <div class="intro">
+    <h2>Directorio y registros de docentes</h2>
+    <p id="teachers-note" aria-live="polite">Cargando el directorio de docentes…</p>
+  </div>
+  <div id="teachers-summary" class="teacher-stats"></div>
+  <section class="panel">
+    <div class="panel__head">
+      <h2>Docentes <span id="teachers-count" class="tally">0</span></h2>
+      <button id="teachers-export" class="btn btn--ghost" type="button">Exportar listado CSV</button>
+    </div>
+    <div class="teacher-filters">
+      <label class="field teacher-search"><span>Buscar docente</span><input id="teacher-search" type="search" placeholder="Nombre, CI o ID del molinete" /></label>
+      <label class="field"><span>Carrera</span><select id="teacher-career"><option value="">Todas las carreras</option></select></label>
+      <label class="field"><span>Registros del período</span><select id="teacher-status">
+        <option value="">Todos los docentes</option>
+        <option value="entered">Con entradas</option>
+        <option value="no-entry">Sin entrada registrada</option>
+        <option value="denied">Con acceso denegado</option>
+        <option value="unmatched">Sin coincidencia en el directorio</option>
+      </select></label>
+    </div>
+    <p id="teachers-result" class="panel__note" aria-live="polite"></p>
+    <div class="table-wrap teacher-table">
+      <table class="table">
+        <thead><tr><th>Docente</th><th>CI</th><th>Carrera</th><th>Estado</th><th class="num">Entradas</th><th class="num">Salidas</th><th>Ficha</th></tr></thead>
+        <tbody id="teachers-tbody"></tbody>
+      </table>
+    </div>
+    <p class="panel__note">Cada entrada o salida es una marcación. «Sin entrada registrada» describe este archivo y período; no determina inasistencia ni cumplimiento de horario.</p>
+  </section>
+  <section id="teacher-detail" class="panel" hidden aria-labelledby="teacher-detail-title" tabindex="-1">
+    <div class="panel__head"><h2 id="teacher-detail-title"></h2><button id="teacher-close" class="btn btn--ghost" type="button">Cerrar ficha</button></div>
+    <dl id="teacher-info" class="teacher-info"></dl>
+    <p id="teacher-events-note" class="panel__note"></p>
+    <div class="table-wrap">
+      <table class="table"><thead><tr><th>Fecha</th><th>Hora</th><th>Evento</th><th>Punto del evento</th><th>ID ZKTeco</th></tr></thead><tbody id="teacher-events"></tbody></table>
+    </div>
+  </section>
+</section>
+
+<style is:global>
+  [hidden] { display: none !important; }
+  .population-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .population-switch .btn[aria-pressed='false'] { background: var(--surface); color: var(--ink-2); border-color: var(--border); }
+  .population-switch p { margin: 0 0 0 8px; color: var(--muted); font-size: .82rem; }
+  .teacher-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .teacher-stat { padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .teacher-stat strong { display: block; font-size: 1.8rem; font-family: var(--display); }
+  .teacher-stat span { color: var(--muted); font-size: .8rem; }
+  .teacher-filters { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+  .teacher-search { flex: 1; min-width: 220px; }
+  .teacher-filters input, .teacher-filters select { width: 100%; min-height: 42px; border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font: inherit; color: var(--ink); background: var(--surface); }
+  .teacher-table { max-height: 560px; }
+  .teacher-table td:first-child { min-width: 220px; font-weight: 500; }
+  .teacher-status { display: inline-block; font-size: .74rem; padding: 4px 8px; border-radius: 6px; background: var(--surface-2); white-space: nowrap; }
+  .teacher-status--entered { color: var(--accent); background: var(--accent-soft); }
+  #teacher-detail { scroll-margin-top: 95px; margin-top: 20px; }
+  .teacher-info { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .teacher-info dt { color: var(--muted); font-size: .78rem; }
+  .teacher-info dd { margin: 3px 0 0; overflow-wrap: anywhere; font-size: .9rem; }
+  @media (max-width: 720px) {
+    .teacher-stats, .teacher-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .teacher-filters > label { flex: 1 1 100%; }
+    .population-switch p { flex-basis: 100%; margin: 0; }
+  }
+  @media print { .population-switch, .teacher-filters, #teachers-export, #teacher-close { display: none !important; } .teacher-table { max-height: none; } }
+</style>

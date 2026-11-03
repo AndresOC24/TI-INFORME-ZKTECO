@@ -20,6 +20,11 @@ export const TIPOS = {
     detalle: 'Padrón de personas dadas de alta en los molinetes. Traduce el ID del molinete a CI.',
     ejemplo: 'Usuarios-Estudiantes.xls',
   },
+  docentes: {
+    titulo: 'Directorio de docentes',
+    detalle: 'Nombres, CI, carrera y datos de contacto. Permite identificar a los docentes en el registro de molinetes.',
+    ejemplo: 'DOCENTES.xlsx',
+  },
 };
 
 export const ES_TIPO_REGISTRABLE = (k) => Object.hasOwn(TIPOS, k);
