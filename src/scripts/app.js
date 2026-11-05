@@ -1,13 +1,15 @@
 import {
-  readWorkbook, detectKind, parseMolinetes, aggregate, parseBD,
+  readWorkbook, detectKind, parseMolinetes, aggregate, parseBD, normName,
   estudiantesDesdeUsuarios, parseUsuarios, resolveBlockedList, careerName, linkStudents, cohortFor,
 } from './parse.js';
 import { hourlyChart, dailyTrend, fmtInt, fmtPct } from './charts.js';
 import { initTheme } from './theme.js';
 import { docentesDesdeUsuarios, parseDocentes, linkDocentes, aggregateDocentes } from './docentes-data.js';
 import { initDocentesView } from './docentes-view.js';
-import { aggregateEstudiantes } from './estudiantes-data.js';
+import { aggregateEstudiantes, estudiantesPorRevisar } from './estudiantes-data.js';
 import { initEstudiantesView } from './estudiantes-view.js';
+import { initDateRange } from './date-range.js';
+import { hourlyProfile } from './hourly-profile.js';
 
 /* molRaw = eventos crudos del archivo; mol = métricas del rango seleccionado.
    usuarios = padrón del ZKTeco, el puente entre el ID del molinete y el CI. */
@@ -195,11 +197,7 @@ function isFullRange() {
 
 function syncRange() {
   const raw = state.molRaw;
-  const from = $('#range-from'), to = $('#range-to');
-  from.min = to.min = raw.minDay;
-  from.max = to.max = raw.maxDay;
-  from.value = state.from;
-  to.value = state.to;
+  syncCalendar({ min: raw.minDay, max: raw.maxDay, from: state.from, to: state.to });
 
   const full = isFullRange();
   $('#range-all').disabled = full;
@@ -231,8 +229,10 @@ function renderAll() {
   $('#students-view').hidden = teachers;
   $('#empty').hidden = !!raw || teachers;
   $('#report').hidden = !raw;
-  renderTeachers(state.teacherRows, state.docentes, !!state.allRaw, state.loadingReferences);
+  renderTeachers(state.teacherRows, state.docentes, !!state.allRaw, state.loadingReferences,
+    { from: state.from, to: state.to, daysWithData: state.allRaw?.daysWithData });
   renderStudents(state.studentRows, state.bd, !!state.allRaw, state.loadingReferences);
+  renderStudentsReview();
   if (!raw) {
     $('#period').textContent = teachers ? 'Docentes · Carga el archivo para ver marcaciones' : 'Estudiantes · Carga el archivo para ver marcaciones';
     return;
@@ -240,7 +240,6 @@ function renderAll() {
 
   syncRange();
   renderPeriod();
-  for (const control of ['#range-from', '#range-to']) $(control).disabled = !raw.minDay;
   if (teachers) {
     $('#range-empty').hidden = true;
     $('#report-body').hidden = true;
@@ -250,10 +249,11 @@ function renderAll() {
   const m = state.mol;
   const sinDatos = !m || m.days.length === 0;
   $('#range-empty').hidden = !sinDatos;
-  $('#report-body').hidden = sinDatos;
-  if (sinDatos) return;
+  $('#report-body').hidden = !m || !state.from;
+  if (!m || !state.from) return;
 
   renderSummary(m);
+  renderDailySummary(m);
   /* La nota deja explícito que las barras son la SUMA del rango, no un día:
      es la confusión natural entre "pasajes acumulados" y "personas". */
   const d = m.days.length;
@@ -262,11 +262,33 @@ function renderAll() {
     : `Suma de los ${d} días del rango, hora por hora. Cada pasada cuenta: no son personas distintas.`;
   $('#chart-hourly').innerHTML = hourlyChart(m.hourEnt, m.hourSal, { days: d });
   renderPeakCareers(m);
-  $('#chart-daily').innerHTML = dailyTrend(m.days, m.perDayEntradas, { salidas: m.perDaySalidas });
+  $('#chart-daily').innerHTML = dailyTrend(m.dailyCounts.map(d => d.day), m.dailyCounts.map(d => d.entradas), { salidas: m.dailyCounts.map(d => d.salidas) });
   renderCareers(m);
   renderBlocked(m);
   renderAdmissions();
   playReveal();
+}
+
+let reviewRows = [];
+function renderStudentsReview() {
+  const panel = $('#students-review');
+  panel.hidden = state.mode === 'teachers';
+  if (panel.hidden) return;
+  reviewRows = estudiantesPorRevisar(state.molRaw, state.bd, state.usuarios, state.from, state.to);
+  $('#students-review-count').textContent = fmtInt(reviewRows.length);
+  renderReviewResults();
+}
+
+function renderReviewResults() {
+  const query = normName($('#students-review-search').value);
+  const rows = reviewRows.filter(row => !query || normName(`${row.nombre} ${row.ci} ${row.cod} ${[...row.ids].join(' ')} ${row.carrera} ${row.motivo}`).includes(query));
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  $('#students-review-results').textContent = `${fmtInt(rows.length)} de ${fmtInt(reviewRows.length)} estudiantes por revisar`;
+  $('#students-review-body').innerHTML = rows.length ? rows.map(row => `<tr>
+    <td>${esc(row.nombre)}</td><td>${esc(row.ci || '—')}</td><td>${esc(row.cod || '—')}</td>
+    <td>${esc([...row.ids].join(', ') || '—')}</td><td>${esc(row.carrera)}</td><td>${esc(row.motivo)}</td>
+    <td class="num">${state.molRaw ? fmtInt(row.dias.size) : '—'}</td>
+  </tr>`).join('') : `<tr><td colspan="7">${state.loadingReferences ? 'Cargando archivos de referencia…' : query ? 'No hay estudiantes que coincidan con la búsqueda.' : !state.bd && !state.molRaw ? 'Carga los archivos para consultar los estudiantes por revisar.' : 'No hay estudiantes THO ni casos sin coincidencia para mostrar.'}</td></tr>`;
 }
 
 function renderSummary(m) {
@@ -287,8 +309,8 @@ function renderSummary(m) {
     : { big: fmtInt(m.entradasUnicas), label: 'Ingresos únicos', sub: 'Carga la BD de estudiantes para ver la asistencia (%)' };
 
   const stats = [
-    { v: fmtInt(m.entradasUnicas), k: 'Ingresos', note: `${m.days.length} ${m.days.length === 1 ? 'día' : 'días'}` },
-    { v: fmtInt(m.distinctInPeriod), k: 'Estudiantes', note: 'ingresados' },
+    { v: fmtInt(m.entradasUnicas), k: 'Total de ingresos diarios', note: 'Máximo 1 por estudiante y día' },
+    { v: fmtInt(m.distinctInPeriod), k: 'Estudiantes distintos', note: 'Sin repetir en todo el período' },
     { v: fmtInt(m.blockedCount), k: 'Bloqueados por deuda', tone: 'alert' },
   ];
 
@@ -321,6 +343,20 @@ function renderSummary(m) {
           <dd data-count="${s.v}">${s.v}</dd>
           ${s.note ? `<p class="stat__note">${s.note}</p>` : ''}
         </div>`).join('')}
+    </dl>`;
+}
+
+function renderDailySummary(m) {
+  const panel = $('#daily-summary');
+  panel.hidden = m.dailyCounts.length < 2;
+  if (panel.hidden) return;
+  panel.innerHTML = `
+    <div class="panel__head"><h2>Estudiantes que ingresaron cada día</h2></div>
+    <p class="panel__note">Cada estudiante cuenta una vez por día, aunque entre varias veces. El total suma los conteos diarios.</p>
+    <dl class="daily-stats">
+      ${m.dailyCounts.map(d => `<div class="stat"><dt>${humanDate(d.day)}</dt>
+        <dd>${fmtInt(d.entradas)}</dd><p class="stat__note">${d.hasRecords ? 'estudiantes con entrada' : 'Sin registros en el archivo'}</p></div>`).join('')}
+      <div class="stat daily-stats__total"><dt>Total del rango</dt><dd>${fmtInt(m.entradasUnicas)}</dd><p class="stat__note">Suma de los ${m.dailyCounts.length} días</p></div>
     </dl>`;
 }
 
@@ -444,6 +480,7 @@ function initTooltip() {
 let lastFocus = null;
 /* Series visibles en el modal: entradas, salidas o ambas. */
 let heatMetric = 'ent';
+let hourlyView = 'total';
 
 const rangeLabel = () =>
   state.from === state.to ? humanDate(state.from) : `${humanDate(state.from)} – ${humanDate(state.to)}`;
@@ -472,31 +509,52 @@ function closeModal() {
   if (lastFocus && lastFocus.isConnected) lastFocus.focus();
 }
 
-/* Afluencia: perfil de 24 h del rango. */
+/* Afluencia: total del rango, promedio diario o un día concreto. */
+function hourlyContent() {
+  const m = state.mol;
+  const profile = hourlyProfile(m, hourlyView);
+  const title = hourlyView === 'average' ? 'Promedio diario · las 24 horas'
+    : hourlyView === 'total' ? 'Total del rango · las 24 horas' : `${humanDate(hourlyView)} · las 24 horas`;
+  const note = hourlyView === 'average'
+    ? `Suma de cada hora dividida entre los ${profile.days} días seleccionados, incluidos los días sin registros. Se muestra un decimal.`
+    : hourlyView === 'total' ? `Suma de los ${profile.days} ${profile.days === 1 ? 'día seleccionado' : 'días seleccionados'}, hora por hora.`
+    : m.dailyCounts.find(d => d.day === hourlyView)?.hasRecords ? 'Marcaciones de la fecha seleccionada, hora por hora.' : 'Esta fecha no tiene registros en el archivo.';
+  return `<h3>${title}</h3>
+    <p class="panel__note">${note} Cada pasada cuenta: no son personas distintas.</p>
+    <div class="modal__scroll">${hourlyChart(profile.ent, profile.sal, { w: 1120, h: 340, days: profile.days, average: profile.average, metric: heatMetric })}</div>`;
+}
+
 function hourlyBody() {
   const m = state.mol;
-
-  return `
-    <section class="modal__section">
-      <h3>Perfil del rango · las 24 horas</h3>
-      <p class="panel__note">Suma de los ${m.days.length} ${m.days.length === 1 ? 'día' : 'días'} del rango, hora por hora. Cada pasada cuenta: no son personas distintas.</p>
-      <div class="modal__scroll">${hourlyChart(m.hourEnt, m.hourSal, { w: 1120, h: 340, days: m.days.length, metric: heatMetric })}</div>
-    </section>`;
+  return `<section class="modal__section">
+    ${m.dailyCounts.length > 1 ? `<div class="hourly-view"><label for="hourly-view">Ver afluencia</label>
+      <select id="hourly-view">
+        <option value="total">Total del rango</option>
+        <option value="average">Promedio diario del rango</option>
+        ${m.dailyCounts.map(d => `<option value="${d.day}">${humanDate(d.day)}${d.hasRecords ? '' : ' · Sin registros'}</option>`).join('')}
+      </select></div>` : ''}
+    <div id="hourly-content">${hourlyContent()}</div>
+  </section>`;
 }
 
 function openHourly() {
   const m = state.mol;
+  hourlyView = 'total';
   openModal(
     'Afluencia por hora',
-    `${rangeLabel()} · ${m.days.length} ${m.days.length === 1 ? 'día' : 'días'} × 24 horas`,
+    `${rangeLabel()} · ${m.dailyCounts.length} ${m.dailyCounts.length === 1 ? 'día' : 'días'} × 24 horas`,
     hourlyBody(),
     segmented([['ent', 'Entradas'], ['sal', 'Salidas'], ['both', 'Ambos']], heatMetric),
   );
   $$('#modal-controls button').forEach((b) => b.addEventListener('click', () => {
     heatMetric = b.dataset.v;
     $$('#modal-controls button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.v === heatMetric)));
-    $('#modal-body').innerHTML = hourlyBody();
+    $('#hourly-content').innerHTML = hourlyContent();
   }));
+  $('#hourly-view')?.addEventListener('change', (event) => {
+    hourlyView = event.target.value;
+    $('#hourly-content').innerHTML = hourlyContent();
+  });
 }
 
 function openDaily() {
@@ -504,15 +562,15 @@ function openDaily() {
   openModal('Ingresos por día', `${rangeLabel()} · ${m.days.length} ${m.days.length === 1 ? 'día' : 'días'} con registros`, `
     <section class="modal__section">
       <p class="panel__note">Estudiantes distintos que ingresaron cada día (1 por persona).</p>
-      <div class="modal__scroll">${dailyTrend(m.days, m.perDayEntradas, { w: 1120, h: 420, salidas: m.perDaySalidas })}</div>
+      <div class="modal__scroll">${dailyTrend(m.dailyCounts.map(d => d.day), m.dailyCounts.map(d => d.entradas), { w: 1120, h: 420, salidas: m.dailyCounts.map(d => d.salidas) })}</div>
     </section>
     <section class="modal__section">
       <h3>Detalle por día</h3>
       <div class="table-wrap">
         <table class="table">
           <thead><tr><th>Día</th><th class="num">Ingresos</th><th class="num">Salidas</th></tr></thead>
-          <tbody>${m.days.map((d, i) => `
-            <tr><td>${humanDate(d)}</td><td class="num">${fmtInt(m.perDayEntradas[i])}</td><td class="num">${fmtInt(m.perDaySalidas[i])}</td></tr>`).join('')}
+          <tbody>${m.dailyCounts.map(d => `
+            <tr><td>${humanDate(d.day)}${d.hasRecords ? '' : ' · Sin registros en el archivo'}</td><td class="num">${fmtInt(d.entradas)}</td><td class="num">${fmtInt(d.salidas)}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
@@ -650,9 +708,6 @@ function initDropzones() {
 }
 
 function initRange() {
-  const from = $('#range-from'), to = $('#range-to');
-  from.addEventListener('change', () => setRange(from.value, state.to));
-  to.addEventListener('change', () => setRange(state.from, to.value));
   $('#range-all').addEventListener('click', () => setRange(state.molRaw.minDay, state.molRaw.maxDay));
   $('#range-7').addEventListener('click', () => lastDays(7));
 }
@@ -670,6 +725,8 @@ function initBlockedToggle() {
 initTheme();
 const renderTeachers = initDocentesView(downloadCSV);
 const renderStudents = initEstudiantesView(downloadCSV);
+const syncCalendar = initDateRange(setRange);
+$('#students-review-search').addEventListener('input', renderReviewResults);
 $('#mode-students').addEventListener('click', () => { state.mode = 'students'; renderFuentes(); renderAll(); });
 $('#mode-teachers').addEventListener('click', () => { state.mode = 'teachers'; renderFuentes(); renderAll(); });
 initDropzones();

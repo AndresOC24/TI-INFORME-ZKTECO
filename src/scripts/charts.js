@@ -19,6 +19,9 @@ const shortDate = (day) => {
    el control de calidad de la dirección: una entrada carga temprano y una
    salida carga tarde, así que un paso mal etiquetado se delata por su forma. */
 export function hourlyChart(hourEnt, hourSal, opts = {}) {
+  const format = opts.average
+    ? value => Number(value || 0).toLocaleString('es-BO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+    : fmtInt;
   const showEnt = opts.metric !== 'sal', showSal = opts.metric !== 'ent';
   const seriesLabel = showEnt && showSal ? 'entradas y salidas' : showEnt ? 'entradas' : 'salidas';
   const W = opts.w || 760, H = opts.h || 268, padL = 44, padR = 12, padT = 32, padB = 30;
@@ -34,7 +37,7 @@ export function hourlyChart(hourEnt, hourSal, opts = {}) {
     const v = (max / ticks) * i;
     const y = padT + ih - (v / max) * ih;
     grid += `<line class="grid" x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}"/>`
-      + `<text class="axis" x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${fmtInt(v)}</text>`;
+      + `<text class="axis" x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${format(v)}</text>`;
   }
 
   let bars = '', labels = '';
@@ -43,30 +46,32 @@ export function hourlyChart(hourEnt, hourSal, opts = {}) {
     const he = (hourEnt[h] / max) * ih, hs = (hourSal[h] / max) * ih;
     const isPeak = showEnt && h === peak && hourEnt[h] > 0;
     const hh = String(h).padStart(2, '0');
-    const values = [showEnt && `${fmtInt(hourEnt[h])} entradas`, showSal && `${fmtInt(hourSal[h])} salidas`].filter(Boolean).join(', ');
-    const tipRows = [showEnt && `ent|Entradas|${fmtInt(hourEnt[h])}`, showSal && `sal|Salidas|${fmtInt(hourSal[h])}`].filter(Boolean).join(';');
+    const values = [showEnt && `${format(hourEnt[h])} entradas`, showSal && `${format(hourSal[h])} salidas`].filter(Boolean).join(', ');
+    const tipRows = [showEnt && `ent|Entradas|${format(hourEnt[h])}`, showSal && `sal|Salidas|${format(hourSal[h])}`].filter(Boolean).join(';');
     // franja invisible de ancho completo: basta apuntar a la columna, no a la barra
     bars += `<g class="hbar${isPeak ? ' peak' : ''}" role="img"`
-      + ` aria-label="${hh}:00 — ${values}"`
+      + ` aria-label="${hh}:00 — ${values}${opts.average ? ' de promedio diario' : ''}${isPeak ? ' · Hora de mayor entrada' : ''}"`
       + ` data-tip-title="${hh}:00 – ${hh}:59"`
-      + (opts.days > 1 ? ` data-tip-foot="acumulado de ${opts.days} días"` : '')
+      + (opts.average ? ` data-tip-foot="promedio diario sobre ${opts.days} días seleccionados"` : opts.days > 1 ? ` data-tip-foot="acumulado de ${opts.days} días"` : '')
       + ` data-tip-rows="${tipRows}">`
+      + (isPeak ? `<rect class="peak-band" x="${(padL + slot * h).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${ih + 24}" rx="5"/>` : '')
       + `<rect class="hit" x="${(padL + slot * h).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${ih}"/>`
       + (showEnt ? `<rect class="col-ent" x="${(showSal ? cx - bw - 1 : cx - bw / 2).toFixed(1)}" y="${(padT + ih - he).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, he).toFixed(1)}" rx="1.5"/>` : '')
       + (showSal ? `<rect class="col-sal" x="${(showEnt ? cx + 1 : cx - bw / 2).toFixed(1)}" y="${(padT + ih - hs).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, hs).toFixed(1)}" rx="1.5"/>` : '')
       + `</g>`;
     // las 24 horas rotuladas si entran; si no, una de cada 3
-    if (slot >= 24 || h % 3 === 0) labels += `<text class="axis" x="${cx.toFixed(1)}" y="${H - 10}" text-anchor="middle">${String(h).padStart(2, '0')}</text>`;
+    if (slot >= 24 || h % 3 === 0 || isPeak) labels += `<text class="axis${isPeak ? ' peak-hour' : ''}" x="${cx.toFixed(1)}" y="${H - 10}" text-anchor="middle">${String(h).padStart(2, '0')}</text>`;
   }
   let peakTag = '';
   if (showEnt && hourEnt[peak] > 0) {
-    const cx = Math.min(W - padR - 30, Math.max(padL + 30, padL + slot * peak + slot / 2));
-    const enDias = opts.days > 1 ? ` en ${opts.days} días` : '';
-    peakTag = `<text class="peak-tag" x="${cx.toFixed(1)}" y="16" text-anchor="middle">pico ${String(peak).padStart(2, '0')}:00 · ${fmtInt(hourEnt[peak])} entradas${enDias}</text>`;
+    const enDias = opts.average ? ' entradas/día en promedio' : ` entradas${opts.days > 1 ? ` en ${opts.days} días` : ''}`;
+    peakTag = `<rect class="peak-badge" x="${padL}" y="2" width="58" height="23" rx="6"/>
+      <text class="peak-hour" x="${padL + 29}" y="18" text-anchor="middle">${String(peak).padStart(2, '0')}:00</text>
+      <text class="peak-tag" x="${padL + 68}" y="18">Mayor entrada · ${format(hourEnt[peak])}${enDias}</text>`;
   }
 
   return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" preserveAspectRatio="xMidYMid meet"
-    aria-label="Afluencia por hora del día, ${seriesLabel}">${grid}${bars}${labels}${peakTag}</svg>`;
+    aria-label="${opts.average ? 'Promedio diario de afluencia por hora' : 'Afluencia por hora del día'}, ${seriesLabel}">${grid}${bars}${labels}${peakTag}</svg>`;
 }
 
 /* Ingresos únicos por día: área + línea. */

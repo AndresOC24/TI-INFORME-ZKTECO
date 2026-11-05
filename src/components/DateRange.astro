@@ -1,0 +1,39 @@
+<div class="date-picker">
+  <span class="field">Fecha o rango</span>
+  <button id="range-picker" class="btn" type="button" aria-haspopup="dialog" aria-controls="range-calendar">Seleccionar fechas</button>
+  <dialog id="range-calendar" class="calendar" aria-labelledby="calendar-title" aria-describedby="calendar-help">
+    <h2 id="calendar-title">Selecciona un día o un rango</h2>
+    <p id="calendar-help">Elige un día y aplica, o elige una segunda fecha para marcar un rango.</p>
+    <div class="calendar__nav">
+      <button id="calendar-prev" class="btn" type="button" aria-label="Mes anterior">‹</button>
+      <strong id="calendar-month" aria-live="polite"></strong>
+      <button id="calendar-next" class="btn" type="button" aria-label="Mes siguiente">›</button>
+    </div>
+    <div class="calendar__week" aria-hidden="true"><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sá</span><span>Do</span></div>
+    <div id="calendar-days" class="calendar__days" role="group" aria-label="Días del mes"></div>
+    <p id="calendar-selection" aria-live="polite"></p>
+    <div class="calendar__actions">
+      <button id="calendar-cancel" class="btn btn--ghost" type="button">Cancelar</button>
+      <button id="calendar-apply" class="btn" type="button">Aplicar</button>
+    </div>
+  </dialog>
+</div>
+
+<style is:global>
+  .date-picker { display: grid; gap: 5px; }
+  .calendar { width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .calendar::backdrop { background: #0008; }
+  .calendar h2 { font-size: 1.05rem; margin: 0; }
+  .calendar p { font-size: .8rem; color: var(--muted); margin: 12px 0; }
+  .calendar__nav { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 12px; }
+  .calendar__nav strong { text-transform: capitalize; }
+  .calendar__week, .calendar__days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .calendar__week { text-align: center; color: var(--muted); font-size: .75rem; margin-bottom: 6px; }
+  .calendar__day { min-height: 38px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+  .calendar__day:hover:not(:disabled) { border-color: var(--accent); }
+  .calendar__day:disabled { opacity: .25; cursor: default; }
+  .calendar__day.is-range { background: var(--accent-soft); }
+  .calendar__day.is-edge { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .calendar__actions { display: flex; justify-content: flex-end; gap: 8px; }
+  #calendar-apply { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+</style>

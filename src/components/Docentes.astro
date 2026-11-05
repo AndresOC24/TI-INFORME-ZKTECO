@@ -4,6 +4,7 @@
     <p id="teachers-note" aria-live="polite">Cargando el directorio de docentes…</p>
   </div>
   <div id="teachers-summary" class="teacher-stats"></div>
+  <section id="teachers-daily-summary" class="panel" aria-label="Docentes con entrada por día" hidden></section>
   <section class="panel">
     <div class="panel__head">
       <h2>Docentes <span id="teachers-count" class="tally">0</span></h2>
@@ -43,7 +44,7 @@
   .population-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
   .population-switch .btn[aria-pressed='false'] { background: var(--surface); color: var(--ink-2); border-color: var(--border); }
   .population-switch p { margin: 0 0 0 8px; color: var(--muted); font-size: .82rem; }
-  .teacher-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .teacher-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
   .teacher-stat { padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
   .teacher-stat strong { display: block; font-size: 1.8rem; font-family: var(--display); }
   .teacher-stat span { color: var(--muted); font-size: .8rem; }

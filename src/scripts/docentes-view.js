@@ -1,5 +1,7 @@
 import { normName, careerName } from './parse.js';
 import { fmtInt } from './charts.js';
+import { docentesPorDia } from './docentes-data.js';
+import { dateOf } from './dates.js';
 
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -70,7 +72,7 @@ export function initDocentesView(downloadCSV) {
     filtered.map(row => [row.nombre, row.ci, row.carreras.join(', '), row.condicion, row.telefono, row.email,
       status(row), loaded ? row.entradas : '', loaded ? row.salidas : '', loaded ? row.denegados : '', loaded ? row.dias.size : ''])));
 
-  return function render(data, reference, hasEvents, loading = false) {
+  return function render(data, reference, hasEvents, loading = false, range = {}) {
     rows = data; roster = reference; loaded = hasEvents;
     const previousCareer = $('#teacher-career').value;
     const careers = [...new Set(rows.flatMap(row => row.carreras))].sort();
@@ -81,11 +83,23 @@ export function initDocentesView(downloadCSV) {
     $('#teachers-note').textContent = loading ? 'Cargando la lista actualizada de docentes…' : roster
       ? `${fmtInt(roster.total)} docentes en el Excel registrado. ${loaded ? 'Consulta las marcaciones del período y abre la ficha de cada docente.' : 'Puedes buscar sus datos ahora. Sube el XLS de molinetes para ver entradas y salidas.'}`
       : 'Carga la lista actualizada de docentes en Archivos de referencia para consultar su total y sus marcaciones.';
-    const stats = [['En el Excel de docentes', roster ? roster.total : '—'],
-      ['Docentes con entrada', loaded ? rows.filter(r => r.entradas).length : '—'],
-      ['Marcaciones de entrada', loaded ? rows.reduce((sum, r) => sum + r.entradas, 0) : '—'],
-      ['Con acceso denegado', loaded ? rows.filter(r => r.denegados).length : '—']];
+    const stats = [['Docentes', roster ? roster.total : '—'],
+      ['Marcaciones de entrada', loaded ? rows.reduce((sum, r) => sum + r.entradas, 0) : '—']];
     $('#teachers-summary').innerHTML = stats.map(([label, value]) => `<div class="teacher-stat"><strong>${typeof value === 'number' ? fmtInt(value) : value}</strong><span>${label}</span></div>`).join('');
+    const panel = $('#teachers-daily-summary');
+    const daily = loaded && roster ? docentesPorDia(rows, range.from, range.to) : [];
+    panel.hidden = daily.length < 2;
+    if (!panel.hidden) {
+      const datesWithRecords = new Set(range.daysWithData || []);
+      const total = daily.reduce((sum, day) => sum + day.count, 0);
+      panel.innerHTML = `<div class="panel__head"><h2>Docentes con entrada por día</h2></div>
+        <p class="panel__note">Cada docente cuenta una vez por día, aunque ingrese varias veces. El total suma los conteos diarios; un docente puede contar en varios días.</p>
+        <dl class="daily-stats">${daily.map(({ day, count }) => `<div class="stat">
+          <dt>${dateOf(day).toLocaleDateString('es-BO', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}</dt>
+          <dd>${fmtInt(count)}</dd><p class="stat__note">${datesWithRecords.has(day) ? 'docentes con entrada' : 'Sin registros en el archivo'}</p>
+        </div>`).join('')}
+        <div class="stat daily-stats__total"><dt>Total de ingresos diarios</dt><dd>${fmtInt(total)}</dd><p class="stat__note">Suma de los ${daily.length} días</p></div></dl>`;
+    }
     renderTable(); renderDetail();
   };
 }

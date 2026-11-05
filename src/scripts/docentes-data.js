@@ -1,5 +1,17 @@
 import * as XLSX from 'xlsx';
 import { docenteHeader, isDocenteNameHeader, normName, nameKey, ciKey, canonCareer } from './parse.js';
+import { daysBetween } from './dates.js';
+
+export function docentesPorDia(rows, from, to) {
+  const counts = new Map(daysBetween(from, to).map(day => [day, 0]));
+  // aggregateDocentes ya agrupa todos los IDs de una persona y deduplica sus días.
+  for (const row of rows) {
+    for (const day of row.dias) {
+      if (counts.has(day)) counts.set(day, counts.get(day) + 1);
+    }
+  }
+  return [...counts].map(([day, count]) => ({ day, count }));
+}
 
 export function parseDocentes(wb) {
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {

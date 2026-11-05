@@ -1,5 +1,38 @@
 import { ciKey, nameKey, UNKNOWN_CAREER } from './parse.js';
 
+// Lista de revisión independiente: incluye casos descartados por el informe.
+export function estudiantesPorRevisar(raw, bd, usuarios, from, to) {
+  const rows = new Map();
+  const add = (key, student, id, career) => {
+    if (!rows.has(key)) {
+      const user = usuarios?.byId.get(id), name = raw?.names.get(id);
+      rows.set(key, {
+        nombre: student?.nombreCompleto || `${user?.apellido || name?.apellido || ''} ${user?.nombre || name?.nombre || ''}`.trim() || `ID ${id}`,
+        ci: student?.ci || user?.ci || '', cod: student?.cod || '',
+        carrera: career || UNKNOWN_CAREER, ids: new Set(), dias: new Set(),
+        motivo: career === 'THO'
+          ? `THO: nombre de carrera pendiente${student ? '' : bd ? ' · Sin coincidencia en la BD' : ''}`
+          : bd ? 'Sin coincidencia en la BD' : 'Sin BD para verificar la carrera',
+      });
+    }
+    if (id) rows.get(key).ids.add(id);
+    return rows.get(key);
+  };
+  // Los estudiantes THO de la BD también se pueden revisar antes de cargar eventos.
+  for (const student of bd?.students || []) {
+    if (student.carrera === 'THO') add(`bd:${student.cod}`, student, null, 'THO');
+  }
+  for (const event of raw?.events || []) {
+    if ((from && event.day < from) || (to && event.day > to)) continue;
+    const student = raw.studentById.get(event.id);
+    const career = student?.carrera || raw.careerById.get(event.id) || UNKNOWN_CAREER;
+    if (career !== 'THO' && (student || (!bd && career !== UNKNOWN_CAREER))) continue;
+    const row = add(student ? `bd:${student.cod}` : `id:${event.id}`, student, event.id, career);
+    if (event.dir === 'E') row.dias.add(event.day);
+  }
+  return [...rows.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
 // El directorio parte de los activos de la BD, incluso sin marcaciones.
 // Sin BD, se muestran los estudiantes del padrón y del archivo de eventos.
 export function aggregateEstudiantes(raw, bd, usuarios, from, to) {

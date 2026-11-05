@@ -1,0 +1,24 @@
+<details id="students-review" class="panel students-review" hidden>
+  <summary>Estudiantes por revisar · THO y sin coincidencia <span id="students-review-count" class="tally">0</span></summary>
+  <p class="panel__note">THO es un código de carrera cuyo nombre está pendiente de identificar. Se muestran los estudiantes THO de la BD, aunque no tengan entradas, y los casos detectados en las marcaciones del rango seleccionado.</p>
+  <label class="field students-review__search">
+    <span>Buscar estudiante por revisar</span>
+    <input id="students-review-search" type="search" placeholder="Nombre, CI, código, ID del molinete o carrera" aria-controls="students-review-body" />
+  </label>
+  <p id="students-review-results" class="panel__note" aria-live="polite"></p>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Estudiante</th><th>CI</th><th>Código académico</th><th>ID ZKTeco</th><th>Carrera</th><th>Motivo de revisión</th><th class="num">Días con entrada</th></tr></thead>
+      <tbody id="students-review-body"></tbody>
+    </table>
+  </div>
+</details>
+
+<style>
+  .students-review { margin-top: 20px; padding: 14px 18px; }
+  .students-review summary { cursor: pointer; font-size: .85rem; font-weight: 600; }
+  .students-review[open] summary { margin-bottom: 14px; }
+  .students-review .table-wrap { max-height: 340px; overflow: auto; }
+  .students-review__search { max-width: 520px; margin-bottom: 10px; }
+  .students-review__search input { width: 100%; min-width: 0; }
+</style>

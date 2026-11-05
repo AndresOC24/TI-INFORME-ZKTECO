@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from 'xlsx';
 import { detectKind, parseMolinetes } from '../src/scripts/parse.js';
-import { parseDocentes, linkDocentes, aggregateDocentes } from '../src/scripts/docentes-data.js';
+import { parseDocentes, linkDocentes, aggregateDocentes, docentesPorDia } from '../src/scripts/docentes-data.js';
 
 const workbook = (rows) => {
   const wb = XLSX.utils.book_new();
@@ -26,6 +26,24 @@ const eventBook = () => workbook([
   ['2026-10-01 10:30:00', 'Entrada', '30', 'Desconocido', 'Prueba', 'DOCENTE', 'Verificado'],
   ['2026-10-01 11:00:00', 'Entrada', '40', 'Personal', 'Prueba', 'ADMINISTRATIVOS', 'Verificado'],
 ]);
+
+test('el resumen diario cuenta docentes una vez por día, reúne sus IDs e incluye días vacíos', () => {
+  const raw = parseMolinetes(eventBook(), { allRoles: true });
+  const reference = roster();
+  const links = linkDocentes(raw, reference, null);
+  links.set('11', links.get('10'));
+  const entrada = raw.events[0];
+  raw.events.push({ ...entrada, id: '11' }, { ...entrada, hour: 15 }, { ...entrada, day: '2026-10-03' });
+  const rows = aggregateDocentes(raw, reference, links, '2026-10-01', '2026-10-04');
+  assert.deepEqual(docentesPorDia(rows, '2026-10-01', '2026-10-04'), [
+    { day: '2026-10-01', count: 1 }, { day: '2026-10-02', count: 0 },
+    { day: '2026-10-03', count: 1 }, { day: '2026-10-04', count: 0 },
+  ]);
+  assert.equal(rows.filter(row => row.entradas > 0).length, 1);
+  assert.equal(rows.reduce((sum, row) => sum + row.entradas, 0), 4);
+  assert.deepEqual(docentesPorDia(rows, '2026-10-03', '2026-10-03'), [{ day: '2026-10-03', count: 1 }]);
+  assert.deepEqual(docentesPorDia(rows, null, null), []);
+});
 
 test('detecta la cabecera real, ignora filas vacias y combina carreras de un mismo CI', () => {
   const wb = directory([[1, 'JOSÉ PEÑA', '00123', 'DDP'], [], [2, 'JOSÉ PEÑA', '123', 'SIS']]);

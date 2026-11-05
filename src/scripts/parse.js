@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { daysBetween } from './dates.js';
 
 /* Reglas de datos verificadas contra los exports reales de UNIFRANZ.
    Ver PRODUCT.md → Capabilities and Constraints. */
@@ -389,6 +390,9 @@ export function aggregate(parsed, fromDay, toDay, bd) {
 
     studentEvents++;
     const cr = careerOf(code);
+    // Una misma ficha académica puede tener varios IDs de molinete.
+    const student = parsed.studentById.get(ev.id);
+    const person = student ? `student:${student.cod}` : `id:${ev.id}`;
     seen.add(ev.id);
 
     /* Asistió quien tiene al menos una ENTRADA. Es la misma definición que usa
@@ -412,14 +416,14 @@ export function aggregate(parsed, fromDay, toDay, bd) {
         blocked.set(ev.id, { nombre: n.nombre, apellido: n.apellido, dept: code });
       }
     } else if (ev.dir === 'E') {
-      addUnique(entradasByDay, ev.day, ev.id);
-      addUnique(cr.entDays, ev.day, ev.id);
+      addUnique(entradasByDay, ev.day, person);
+      addUnique(cr.entDays, ev.day, person);
       hourEnt[ev.hour]++;
       dayHourOf(ev.day).ent[ev.hour]++;
       cr.hEnt[ev.hour]++;
     } else {
-      addUnique(salidasByDay, ev.day, ev.id);
-      addUnique(cr.salDays, ev.day, ev.id);
+      addUnique(salidasByDay, ev.day, person);
+      addUnique(cr.salDays, ev.day, person);
       hourSal[ev.hour]++;
       dayHourOf(ev.day).sal[ev.hour]++;
       cr.hSal[ev.hour]++;
@@ -465,6 +469,11 @@ export function aggregate(parsed, fromDay, toDay, bd) {
     entradasUnicas: sumUnique(entradasByDay),
     salidasUnicas: sumUnique(salidasByDay),
     perDayEntradas, perDaySalidas,
+    dailyCounts: daysBetween(from, to).map(day => ({
+      day, entradas: entradasByDay.get(day)?.size || 0,
+      salidas: salidasByDay.get(day)?.size || 0,
+      hasRecords: parsed.daysWithData.includes(day),
+    })),
     distinctInPeriod: distinctInPeriod.size,
     hourEnt, hourSal,
     /* matriz día × hora (24 columnas por día) para el heatmap ampliado */

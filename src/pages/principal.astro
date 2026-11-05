@@ -2,6 +2,8 @@
 import Informe from '../layouts/Informe.astro';
 import Docentes from '../components/Docentes.astro';
 import Estudiantes from '../components/Estudiantes.astro';
+import DateRange from '../components/DateRange.astro';
+import EstudiantesRevision from '../components/EstudiantesRevision.astro';
 ---
 
 <Informe titulo="Informe de acceso">
@@ -40,10 +42,7 @@ import Estudiantes from '../components/Estudiantes.astro';
 
         <div id="report" hidden>
           <section class="rangebar" aria-label="Rango de fechas">
-            <div class="rangebar__fields">
-              <label class="field"><span>Desde</span><input id="range-from" type="date" /></label>
-              <label class="field"><span>Hasta</span><input id="range-to" type="date" /></label>
-            </div>
+            <DateRange />
             <div class="rangebar__actions">
               <button id="range-7" class="btn btn--ghost btn--sm" type="button">Últimos 7 días</button>
               <button id="range-all" class="btn btn--ghost btn--sm" type="button">Todo el período</button>
@@ -55,6 +54,7 @@ import Estudiantes from '../components/Estudiantes.astro';
 
           <div id="report-body">
           <section id="summary" class="summary" aria-label="Resumen"></section>
+          <section id="daily-summary" class="panel" aria-label="Conteo diario de estudiantes" hidden></section>
 
           <div class="grid-2">
             <section class="panel">
@@ -128,6 +128,7 @@ import Estudiantes from '../components/Estudiantes.astro';
         </div>
         <Estudiantes />
         <Docentes />
+        <EstudiantesRevision />
       </main>
 
       <div id="modal" class="modal" hidden>
