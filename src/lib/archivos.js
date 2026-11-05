@@ -11,18 +11,18 @@ import { readHeader, detectKind } from '../scripts/parse.js';
    devolverlo es agregar una entrada acá y su zona de carga. */
 export const TIPOS = {
   bd: {
-    titulo: 'BD de estudiantes',
+    titulo: 'BD de estudiantes CUBO',
     detalle: 'Listado de estudiantes activos de la gestión. Da el total de activos, la carrera y el CI.',
     ejemplo: 'DB_Estudiantes-10_09_2026.xls',
   },
   usuarios: {
-    titulo: 'Usuarios del ZKTeco',
-    detalle: 'Padrón de personas dadas de alta en los molinetes. Traduce el ID del molinete a CI.',
-    ejemplo: 'Usuarios-Estudiantes.xls',
+    titulo: 'Usuarios del ZKTeco (todos los roles)',
+    detalle: 'Lista completa de estudiantes, docentes, administrativos, visitas y postgrado. El rol identifica a cada usuario.',
+    ejemplo: 'Usuarios.xls',
   },
   docentes: {
-    titulo: 'Directorio de docentes',
-    detalle: 'Nombres, CI, carrera y datos de contacto. Permite identificar a los docentes en el registro de molinetes.',
+    titulo: 'Lista actualizada de docentes',
+    detalle: 'Define el listado y el total de docentes del informe. Excel con columnas Docente (o Nombre completo), CI y Carrera. Teléfono, Email y condición son opcionales. Cada CI se cuenta una sola vez, aunque figure en varias carreras.',
     ejemplo: 'DOCENTES.xlsx',
   },
 };

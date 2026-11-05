@@ -254,6 +254,8 @@ const { titulo } = Astro.props;
       }
       .segmented button:hover { color: var(--ink); }
       .segmented button[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
+      .segmented button[data-v='sal'][aria-pressed='true'] { background: var(--series-2); color: var(--bg); }
+      .segmented button[data-v='both'][aria-pressed='true'] { background: linear-gradient(110deg, var(--accent) 50%, var(--series-2) 50%); color: var(--accent-ink); }
 
       .modal__scroll { overflow-x: auto; padding-bottom: 6px; }
       .modal__section { margin-top: 26px; }
@@ -263,6 +265,8 @@ const { titulo } = Astro.props;
 
       /* mapa de calor día × hora */
       .heatmap .hm-cell { fill: var(--accent); transition: stroke .12s; stroke: transparent; stroke-width: 2; }
+      [data-metric='sal'] .heatmap .hm-cell { fill: var(--series-2); }
+      [data-metric='sal'] .hm-key { background: var(--series-2); }
       .heatmap .hm-cell.is-zero { fill: var(--track); fill-opacity: 1; }
       .heatmap .hm-cell:hover { stroke: var(--ink); }
       .heatmap .hm-day { font-variant-numeric: tabular-nums; }

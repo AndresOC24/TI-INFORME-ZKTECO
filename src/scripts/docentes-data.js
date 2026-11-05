@@ -40,25 +40,47 @@ export function parseDocentes(wb) {
   return { kind: 'docentes', teachers, byCI, byName, total: teachers.length, duplicateRows };
 }
 
+// El Excel actualizado determina la población. ZKTeco solo aporta IDs y contacto.
+export function docentesDesdeUsuarios(usuarios, directorio) {
+  if (!directorio) return null;
+  const teachers = directorio.teachers.map(person => ({ ...person, zktecoIds: [] }));
+  const byKey = new Map(teachers.map(person => [person.key, person]));
+  const byCI = new Map([...directorio.byCI].map(([ci, person]) => [ci, byKey.get(person.key)]));
+  const byName = new Map([...directorio.byName].map(([name, person]) => [name, person ? byKey.get(person.key) : null]));
+  const roster = { ...directorio, teachers, byCI, byName, byId: new Map(), total: teachers.length };
+  for (const [id, user] of usuarios?.byId || []) {
+    const person = matchDocente(roster, user, `${user.apellido} ${user.nombre}`).person;
+    if (!person) continue;
+    person.zktecoIds.push(id);
+    person.telefono ||= user.telefono || '';
+    person.email ||= user.email || '';
+    roster.byId.set(id, person);
+  }
+  return roster;
+}
+
+function matchDocente(roster, user, nombre) {
+  const ci = ciKey(user?.ci);
+  const byCI = ci && roster.byCI.get(ci);
+  if (byCI) return { person: byCI, match: 'CI' };
+  const names = [user && `${user.apellido} ${user.nombre}`, nombre].filter(Boolean);
+  for (const name of names) {
+    const person = roster.byName.get(nameKey(name));
+    // Un nombre igual no debe unir personas con documentos distintos.
+    if (person && !(ci && ciKey(person.ci) && ci !== ciKey(person.ci))) return { person, match: 'Nombre' };
+  }
+  return {};
+}
+
 export function linkDocentes(raw, roster, usuarios) {
   const byId = new Map();
-  if (!raw) return byId;
-  const teacherIds = new Set(raw.events.filter(e => /^DOCENTES?$/.test(normName(e.department))).map(e => e.id));
+  if (!raw || !roster) return byId;
   for (const [id, name] of raw.names) {
     const user = usuarios?.byId.get(id);
-    const ci = ciKey(user?.ci);
-    let person = ci ? roster?.byCI.get(ci) : null;
-    let match = person ? 'CI' : '';
-    if (!person) {
-      person = (user && roster?.byName.get(nameKey(`${user.apellido} ${user.nombre}`)))
-        || roster?.byName.get(nameKey(`${name.apellido} ${name.nombre}`));
-      if (person) match = 'Nombre';
-    }
-    if (person) byId.set(id, { person, match });
-    else if (teacherIds.has(id)) byId.set(id, { match: 'Sin coincidencia', person: {
-      key: `zkteco:${id}`, nombre: `${name.apellido} ${name.nombre}`.trim() || `ID ${id}`,
-      ci: user?.ci || '', carreras: [], telefono: '', email: '', condicion: '', registered: false,
-    } });
+    const person = roster.byId?.get(id);
+    if (person) { byId.set(id, { person, match: 'ID ZKTeco' }); continue; }
+    const link = matchDocente(roster, user, `${name.apellido} ${name.nombre}`);
+    if (link.person) byId.set(id, link);
   }
   return byId;
 }
@@ -66,7 +88,7 @@ export function linkDocentes(raw, roster, usuarios) {
 export function aggregateDocentes(raw, roster, links, from, to) {
   const rows = new Map();
   const add = (person) => {
-    if (!rows.has(person.key)) rows.set(person.key, { ...person, ids: new Set(), matches: new Set(),
+    if (!rows.has(person.key)) rows.set(person.key, { ...person, ids: new Set(person.zktecoIds || []), matches: new Set(),
       events: [], entradas: 0, salidas: 0, denegados: 0, dias: new Set(), last: '' });
     return rows.get(person.key);
   };

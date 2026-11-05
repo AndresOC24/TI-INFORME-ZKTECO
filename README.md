@@ -91,3 +91,9 @@ Referencias:
 - https://docs.astro.build/en/guides/integrations-guide/node/
 - https://httpd.apache.org/docs/2.4/bind.html
 - https://laragon.org/docs/easy-to-extend
+
+## Lista unificada de usuarios
+
+En `/registrar` se cargan la BD académica, la lista completa de usuarios del ZKTeco y el Excel actualizado de docentes. Para estudiantes se usa el rol del padrón o, si falta el ID, el departamento del evento. Para docentes manda la pertenencia al Excel actualizado, vinculada por CI o nombre no ambiguo.
+
+La **Lista actualizada de docentes** se carga por separado en `/registrar` y determina quién aparece y el total de docentes. Requiere columnas Docente (o Nombre completo), CI y Carrera; cuenta cada CI una vez y combina sus carreras. ZKTeco solo vincula IDs y completa contactos faltantes. Se incluyen docentes del Excel sin marcaciones y se excluyen usuarios que solo figuran en ZKTeco. Sin este Excel se solicita cargarlo, sin sustituirlo por el padrón.

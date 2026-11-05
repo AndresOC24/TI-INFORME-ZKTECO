@@ -1,6 +1,7 @@
 ---
 import Informe from '../layouts/Informe.astro';
 import Docentes from '../components/Docentes.astro';
+import Estudiantes from '../components/Estudiantes.astro';
 ---
 
 <Informe titulo="Informe de acceso">
@@ -34,7 +35,7 @@ import Docentes from '../components/Docentes.astro';
         <section id="empty" class="empty">
           <svg class="empty__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
           <h2>Carga el registro de molinetes para generar el informe</h2>
-          <p>El archivo de molinetes se procesa en tu navegador. Alterna entre estudiantes y docentes sin volver a cargarlo. Los directorios y el padrón del ZKTeco se toman de los archivos registrados en el servidor.</p>
+          <p>El archivo de molinetes se procesa en tu navegador. Alterna entre estudiantes y docentes sin volver a cargarlo.</p>
         </section>
 
         <div id="report" hidden>
@@ -125,6 +126,7 @@ import Docentes from '../components/Docentes.astro';
           </section>
           </div>
         </div>
+        <Estudiantes />
         <Docentes />
       </main>
 

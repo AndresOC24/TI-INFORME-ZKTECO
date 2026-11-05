@@ -55,7 +55,7 @@ test('cruza por nombre sin tildes y distingue denegaciones, no entradas y descon
   const reference = roster();
   const links = linkDocentes(raw, reference, null);
   const rows = aggregateDocentes(raw, reference, links);
-  assert.equal(rows.length, 3);
+  assert.equal(rows.length, 2);
   assert.equal(links.has('20'), false);
   assert.equal(links.has('40'), false);
   const jose = rows.find(r => r.key === 'ci:123');
@@ -64,7 +64,7 @@ test('cruza por nombre sin tildes y distingue denegaciones, no entradas y descon
   assert.equal(jose.denegados, 1);
   assert.equal(jose.dias.size, 1);
   assert.equal(rows.find(r => r.key === 'ci:456').events.length, 0);
-  assert.equal(rows.find(r => r.key === 'zkteco:30').registered, false);
+  assert.equal(rows.some(r => r.key === 'zkteco:30'), false);
 });
 
 test('filtra fechas sin arrastrar marcaciones fuera del rango', () => {
@@ -89,13 +89,13 @@ test('el CI del padron tiene prioridad, incluso con otro departamento y nombre a
 test('los homonimos quedan sin coincidencia por nombre y se pueden resolver por CI', () => {
   const reference = parseDocentes(directory([[1, 'JOSE PENA', '123', 'SIS'], [2, 'JOSE PENA', '456', 'MED']]));
   const raw = parseMolinetes(eventBook(), { allRoles: true });
-  assert.equal(linkDocentes(raw, reference).get('10').person.registered, false);
+  assert.equal(linkDocentes(raw, reference).has('10'), false);
   const users = { byId: new Map([['10', { ci: '456' }]]) };
   assert.equal(linkDocentes(raw, reference, users).get('10').person.key, 'ci:456');
 });
 
-test('sin directorio conserva los eventos DOCENTE sin incluir visitantes ni estudiantes', () => {
+test('sin Excel no utiliza los roles del evento como lista actualizada', () => {
   const raw = parseMolinetes(eventBook(), { allRoles: true });
   const links = linkDocentes(raw, null, null);
-  assert.deepEqual([...links.keys()], ['10', '30']);
+  assert.deepEqual([...links.keys()], []);
 });

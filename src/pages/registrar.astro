@@ -15,12 +15,13 @@ import Informe from '../layouts/Informe.astro';
       <h2>Archivos que usa el informe</h2>
       <p>
         Estos archivos cambian cada varios meses, así que se guardan una vez y el informe
-        los toma solo: en la pantalla principal ya solo hay que soltar el export de molinetes.
+        los toma solo: en la pantalla principal ya solo hay que soltar el archivo exportado desde el sistema ZKTeco de molinetes.
         Al subir uno nuevo <strong>reemplaza al que estaba</strong>. El tipo se reconoce por el
         contenido del archivo, no por su nombre, y si no corresponde se rechaza sin tocar nada.
       </p>
     </section>
 
+    <p class="intro">Carga la Base de datos de estudiantes, el padrón de usuarios del ZKTeco y la lista actualizada de docentes. El Excel de docentes define quiénes aparecen y cuántos son; incluye también a quienes no tienen marcaciones. El padrón ZKTeco permite vincular sus identificadores con las entradas y salidas.</p>
     <div id="reg" class="reg" aria-live="polite"></div>
   </main>
 </Informe>

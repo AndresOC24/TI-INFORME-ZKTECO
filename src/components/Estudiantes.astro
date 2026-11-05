@@ -1,0 +1,43 @@
+<section id="students-view" hidden aria-label="Registros de estudiantes">
+  <section class="panel">
+    <div class="panel__head">
+      <h2>Estudiantes <span id="students-count" class="tally">0</span></h2>
+      <button id="students-export" class="btn btn--ghost" type="button">Exportar listado CSV</button>
+    </div>
+    <p id="students-note" class="panel__note" aria-live="polite"></p>
+    <div class="teacher-filters">
+      <label class="field teacher-search"><span>Buscar estudiante</span><input id="student-search" type="search" placeholder="Nombre, CI, código o ID del molinete" /></label>
+      <label class="field"><span>Carrera</span><select id="student-career"><option value="">Todas las carreras</option></select></label>
+      <label class="field"><span>Registros del período</span><select id="student-status">
+        <option value="">Todos los estudiantes</option>
+        <option value="entered">Con entradas</option>
+        <option value="no-entry">Sin entrada registrada</option>
+        <option value="denied">Con acceso denegado</option>
+        <option value="unmatched">Sin coincidencia en el directorio</option>
+      </select></label>
+    </div>
+    <p id="students-result" class="panel__note" aria-live="polite"></p>
+    <div class="table-wrap teacher-table">
+      <table class="table">
+        <thead><tr><th>Estudiante</th><th>CI</th><th>Carrera</th><th>Estado</th><th class="num">Entradas</th><th class="num">Salidas</th><th>Ficha</th></tr></thead>
+        <tbody id="students-tbody"></tbody>
+      </table>
+    </div>
+    <p class="panel__note">Cada entrada o salida es una marcación. «Sin entrada registrada» describe este archivo y período; no determina inasistencia ni cumplimiento de horario.</p>
+  </section>
+  <section id="student-detail" class="panel" hidden aria-labelledby="student-detail-title" tabindex="-1">
+    <div class="panel__head"><h2 id="student-detail-title"></h2><button id="student-close" class="btn btn--ghost" type="button">Cerrar ficha</button></div>
+    <dl id="student-info" class="teacher-info"></dl>
+    <p id="student-events-note" class="panel__note"></p>
+    <div class="table-wrap">
+      <table class="table"><thead><tr><th>Fecha</th><th>Hora</th><th>Evento</th><th>Punto del evento</th><th>ID ZKTeco</th></tr></thead><tbody id="student-events"></tbody></table>
+    </div>
+  </section>
+</section>
+
+<style>
+  #students-view { margin-top: 20px; }
+  #student-detail { scroll-margin-top: 95px; margin-top: 20px; }
+  @media print { #students-export, #student-close { display: none !important; } }
+</style>
+

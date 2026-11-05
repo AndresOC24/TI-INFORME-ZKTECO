@@ -14,7 +14,7 @@ export async function GET({ params }) {
   return new Response(reg.buffer, {
     headers: {
       'content-type': 'application/vnd.ms-excel',
-      'content-disposition': `inline; filename="${encodeURIComponent(reg.nombre)}"`,
+      'content-disposition': `inline; filename="${encodeURIComponent(reg.nombre)}"; filename*=UTF-8''${encodeURIComponent(reg.nombre).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase())}`,
       'cache-control': 'no-store',
       'x-archivo-nombre': encodeURIComponent(reg.nombre),
     },

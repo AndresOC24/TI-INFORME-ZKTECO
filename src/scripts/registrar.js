@@ -24,6 +24,10 @@ function card(kind, info, reg) {
   const actual = reg
     ? `<div class="reg__current">
          <span class="reg__name">${esc(reg.nombre)}</span>
+         <a class="navlink" href="/api/archivos/${encodeURIComponent(kind)}" download="${esc(reg.nombre)}" aria-label="Descargar ${esc(reg.nombre)}">
+           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+           Descargar archivo
+         </a>
          <span class="reg__meta">${peso(reg.bytes)} · actualizado ${fecha(reg.actualizado)}</span>
        </div>`
     : `<div class="reg__current reg__current--empty">

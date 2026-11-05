@@ -17,13 +17,12 @@ export function initDocentesView(downloadCSV) {
       && (!career || row.carreras.includes(career))
       && (!filter || (filter === 'entered' && loaded && row.entradas > 0)
         || (filter === 'no-entry' && loaded && !row.entradas)
-        || (filter === 'denied' && loaded && row.denegados > 0)
-        || (filter === 'unmatched' && !row.registered)));
-    $('#teachers-count').textContent = fmtInt(rows.length);
+        || (filter === 'denied' && loaded && row.denegados > 0)));
+    $('#teachers-count').textContent = roster ? fmtInt(roster.total) : '—';
     $('#teachers-result').textContent = `${fmtInt(filtered.length)} de ${fmtInt(rows.length)} docentes · selecciona «Ver ficha» para consultar sus datos y marcaciones.`;
     $('#teachers-export').disabled = !filtered.length;
     $('#teachers-tbody').innerHTML = filtered.length ? filtered.map(row => `<tr>
-      <td>${esc(row.nombre)}${!row.registered ? '<br><small>Sin coincidencia en el directorio</small>' : ''}</td>
+      <td>${esc(row.nombre)}</td>
       <td>${esc(row.ci || '—')}</td><td>${esc(row.carreras.join(', ') || '—')}</td>
       <td><span class="teacher-status${row.entradas ? ' teacher-status--entered' : ''}">${status(row)}</span></td>
       <td class="num">${loaded ? fmtInt(row.entradas) : '—'}</td><td class="num">${loaded ? fmtInt(row.salidas) : '—'}</td>
@@ -38,7 +37,7 @@ export function initDocentesView(downloadCSV) {
     $('#teacher-detail-title').textContent = row.nombre;
     const fields = [['CI', row.ci], ['Carrera', row.carreras.map(careerName).join(', ')],
       ['Condición', row.condicion], ['Teléfono', row.telefono], ['Correo', row.email],
-      ['Identificación', !row.registered ? 'Sin coincidencia en el directorio' : row.matches.size ? [...row.matches].join(', ') : 'Directorio de docentes'],
+      ['Identificación', row.matches.size ? [...row.matches].join(', ') : 'Lista actualizada de docentes'],
       ['ID ZKTeco', [...row.ids].join(', ')], ['Días con entrada', loaded ? fmtInt(row.dias.size) : '—'],
       ['Última marcación del período', row.last]];
     $('#teacher-info').innerHTML = fields.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value || '—')}</dd></div>`).join('');
@@ -79,11 +78,10 @@ export function initDocentesView(downloadCSV) {
     $('#teacher-career').value = careers.includes(previousCareer) ? previousCareer : '';
     $('#teacher-status').disabled = !loaded;
     if (!loaded) $('#teacher-status').value = '';
-    const unmatched = rows.filter(r => !r.registered).length;
-    $('#teachers-note').textContent = loading ? 'Cargando el directorio de docentes…' : roster
-      ? `${fmtInt(roster.total)} docentes en el directorio. ${loaded ? 'Consulta las marcaciones del período y abre la ficha de cada docente.' : 'Puedes buscar sus datos ahora. Sube el XLS de molinetes para ver entradas y salidas.'}${unmatched ? ` ${fmtInt(unmatched)} personas con rol DOCENTE no coinciden con el directorio.` : ''}`
-      : 'No se pudo cargar el directorio de docentes. Registra DOCENTES.xlsx en Archivos para consultar sus datos completos.';
-    const stats = [['En el directorio', roster ? roster.total : '—'],
+    $('#teachers-note').textContent = loading ? 'Cargando la lista actualizada de docentes…' : roster
+      ? `${fmtInt(roster.total)} docentes en el Excel registrado. ${loaded ? 'Consulta las marcaciones del período y abre la ficha de cada docente.' : 'Puedes buscar sus datos ahora. Sube el XLS de molinetes para ver entradas y salidas.'}`
+      : 'Carga la lista actualizada de docentes en Archivos de referencia para consultar su total y sus marcaciones.';
+    const stats = [['En el Excel de docentes', roster ? roster.total : '—'],
       ['Docentes con entrada', loaded ? rows.filter(r => r.entradas).length : '—'],
       ['Marcaciones de entrada', loaded ? rows.reduce((sum, r) => sum + r.entradas, 0) : '—'],
       ['Con acceso denegado', loaded ? rows.filter(r => r.denegados).length : '—']];

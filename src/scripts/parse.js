@@ -263,7 +263,11 @@ export function parseUsuarios(wb) {
     if (!nombre && !apellido && !ci) continue;
     total++;
     if (!ci) sinCI++;
-    byId.set(id, { nombre, apellido, ci });
+    byId.set(id, { nombre, apellido, ci,
+      rol: normName(row[ix('Nombre de Departamento')]),
+      telefono: String(row[ix('Celular')] || '').trim(),
+      email: String(row[ix('Email')] || '').trim(),
+    });
   }
 
   return { kind: 'usuarios', byId, total, sinCI };
@@ -676,3 +680,16 @@ export function docenteHeader(rows) {
 
 export const isDocenteNameHeader = (value) => /^(?:\d+ )?DOCENTES?(?: G.*)?$/.test(value)
   || ['NOMBRE COMPLETO', 'NOMBRES Y APELLIDOS'].includes(value);
+
+// El rol actual del padron tiene prioridad; para IDs ausentes se usa el evento.
+export function estudiantesDesdeUsuarios(raw, usuarios) {
+  if (!raw) return null;
+  const events = raw.events.filter(e => {
+    const rol = usuarios?.byId.get(e.id)?.rol;
+    return rol ? rol === 'ESTUDIANTE' : normName(e.department) === 'ESTUDIANTE' || STUDENT_SET.has(e.department);
+  });
+  const ids = new Set(events.map(e => e.id));
+  return { ...raw, events, names: new Map([...raw.names].filter(([id]) => ids.has(id))),
+    careerById: new Map([...raw.careerById].filter(([id]) => ids.has(id))),
+    studentById: new Map(), matchById: new Map() };
+}

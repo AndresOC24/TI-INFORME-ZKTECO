@@ -1,16 +1,18 @@
 import {
   readWorkbook, detectKind, parseMolinetes, aggregate, parseBD,
-  parseUsuarios, resolveBlockedList, careerName, linkStudents, cohortFor,
+  estudiantesDesdeUsuarios, parseUsuarios, resolveBlockedList, careerName, linkStudents, cohortFor,
 } from './parse.js';
-import { hourlyChart, dailyTrend, hourHeatmap, heatmapLegend, dayLabel, fmtInt, fmtPct } from './charts.js';
+import { hourlyChart, dailyTrend, fmtInt, fmtPct } from './charts.js';
 import { initTheme } from './theme.js';
-import { parseDocentes, linkDocentes, aggregateDocentes } from './docentes-data.js';
+import { docentesDesdeUsuarios, parseDocentes, linkDocentes, aggregateDocentes } from './docentes-data.js';
 import { initDocentesView } from './docentes-view.js';
+import { aggregateEstudiantes } from './estudiantes-data.js';
+import { initEstudiantesView } from './estudiantes-view.js';
 
 /* molRaw = eventos crudos del archivo; mol = métricas del rango seleccionado.
    usuarios = padrón del ZKTeco, el puente entre el ID del molinete y el CI. */
 const state = { molRaw: null, allRaw: null, mol: null, bd: null, usuarios: null, docentes: null,
-  docenteLinks: new Map(), teacherRows: [], mode: 'students', loadingReferences: true,
+  docenteLinks: new Map(), teacherRows: [], studentRows: [], mode: 'students', loadingReferences: true,
   nuevos: null, from: null, to: null };
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -115,6 +117,7 @@ async function cargarReferencias() {
   await traer('bd', parseBD, (v) => { state.bd = v; });
   await traer('usuarios', parseUsuarios, (v) => { state.usuarios = v; });
   await traer('docentes', parseDocentes, (v) => { state.docentes = v; });
+  state.docentes = docentesDesdeUsuarios(state.usuarios, state.docentes);
   state.loadingReferences = false;
   state.docenteLinks = linkDocentes(state.allRaw, state.docentes, state.usuarios);
 
@@ -127,9 +130,9 @@ function renderFuentes() {
   const linea = $('#fuentes');
   if (!linea) return;
   const partes = [];
-  if (state.bd) partes.push(`BD · ${fmtInt(state.bd.total)} activos`);
-  if (state.usuarios) partes.push(`padrón ZKTeco · ${fmtInt(state.usuarios.total)} usuarios`);
-  if (state.docentes) partes.push(`directorio · ${fmtInt(state.docentes.total)} docentes`);
+  if (state.bd) partes.push(`CUBO: ${fmtInt(state.bd.total)} estudiantes activos`);
+  if (state.usuarios) partes.push(`ZKTeco: ${fmtInt(state.usuarios.total)} usuarios registrados`);
+  if (state.docentes) partes.push(`Docentes: ${fmtInt(state.docentes.total)} registrados`);
 
   if (!partes.length) {
     linea.className = 'fuentes fuentes--err';
@@ -137,7 +140,7 @@ function renderFuentes() {
       + '<a href="/registrar">Registrarlos</a>.';
     return;
   }
-  const faltan = state.mode === 'teachers' && !state.docentes ? 'falta el directorio de docentes'
+  const faltan = state.mode === 'teachers' && !state.docentes ? 'falta la lista actualizada de docentes'
     : state.mode === 'students' && !state.bd ? 'falta la BD de estudiantes'
     : !state.usuarios ? 'falta el padrón del ZKTeco (el cruce por CI queda fuera)' : '';
   linea.className = 'fuentes';
@@ -159,9 +162,11 @@ function setZoneStateEl(el, st, msg, name) {
 
 /* Recalcula todo el informe desde los eventos ya parseados: no relee el Excel. */
 function recompute() {
+  state.molRaw = estudiantesDesdeUsuarios(state.allRaw, state.usuarios);
   state.teacherRows = aggregateDocentes(state.allRaw, state.docentes, state.docenteLinks, state.from, state.to);
+  if (state.molRaw) linkStudents(state.molRaw, state.bd, state.usuarios);
+  state.studentRows = aggregateEstudiantes(state.molRaw, state.bd, state.usuarios, state.from, state.to);
   if (!state.molRaw) { state.mol = null; return; }
-  linkStudents(state.molRaw, state.bd, state.usuarios);
   state.mol = aggregate(state.molRaw, state.from, state.to, state.bd);
 }
 
@@ -223,11 +228,13 @@ function renderAll() {
   $('#mode-students').setAttribute('aria-pressed', String(!teachers));
   $('#mode-teachers').setAttribute('aria-pressed', String(teachers));
   $('#teachers-view').hidden = !teachers;
+  $('#students-view').hidden = teachers;
   $('#empty').hidden = !!raw || teachers;
   $('#report').hidden = !raw;
   renderTeachers(state.teacherRows, state.docentes, !!state.allRaw, state.loadingReferences);
+  renderStudents(state.studentRows, state.bd, !!state.allRaw, state.loadingReferences);
   if (!raw) {
-    $('#period').textContent = teachers ? 'Directorio de docentes · carga el XLS para ver marcaciones' : 'Carga un archivo para comenzar';
+    $('#period').textContent = teachers ? 'Docentes · Carga el archivo para ver marcaciones' : 'Estudiantes · Carga el archivo para ver marcaciones';
     return;
   }
 
@@ -435,7 +442,7 @@ function initTooltip() {
 /* ---------- modal: gráficos ampliados ---------- */
 
 let lastFocus = null;
-/* Métrica de los mapas de calor del modal: 'ent' o 'sal'. */
+/* Series visibles en el modal: entradas, salidas o ambas. */
 let heatMetric = 'ent';
 
 const rangeLabel = () =>
@@ -465,82 +472,15 @@ function closeModal() {
   if (lastFocus && lastFocus.isConnected) lastFocus.focus();
 }
 
-/* Afluencia: perfil de 24 h del rango + mapa de calor día × hora. */
-function heatMax(m) {
-  let max = 1;
-  for (const r of m.hourByDay) {
-    for (let h = 0; h < 24; h++) {
-      const v = heatMetric === 'sal' ? r.sal[h] : r.ent[h];
-      if (v > max) max = v;
-    }
-  }
-  return max;
-}
-
-/* Carreras presentes en la hora pico, de mayor a menor. */
-function careersAtHour(m, hour) {
-  return m.byCareer
-    .map((c) => ({ code: c.code, n: c.hourEnt[hour] }))
-    .filter((c) => c.n > 0)
-    .sort((a, b) => b.n - a.n);
-}
-
+/* Afluencia: perfil de 24 h del rango. */
 function hourlyBody() {
   const m = state.mol;
-  const qué = heatMetric === 'sal' ? 'salidas' : 'entradas';
-  const pico = m.hourEnt.indexOf(Math.max(...m.hourEnt));
-  const enPico = careersAtHour(m, pico);
-  const maxPico = Math.max(1, ...enPico.map((c) => c.n));
-  const conCarrera = m.byCareer.filter((c) => c.pasajesEnt > 0);
-  const hh = (h) => `${String(h).padStart(2, '0')}:00`;
 
   return `
     <section class="modal__section">
       <h3>Perfil del rango · las 24 horas</h3>
       <p class="panel__note">Suma de los ${m.days.length} ${m.days.length === 1 ? 'día' : 'días'} del rango, hora por hora. Cada pasada cuenta: no son personas distintas.</p>
-      <div class="modal__scroll">${hourlyChart(m.hourEnt, m.hourSal, { w: 1120, h: 340, days: m.days.length })}</div>
-    </section>
-
-    <section class="modal__section">
-      <h3>Quiénes llegan en la hora pico · ${hh(pico)}</h3>
-      <p class="panel__note">Carreras que componen las ${fmtInt(m.hourEnt[pico])} entradas de esa franja.</p>
-      <div class="bars">${enPico.map((c) => `
-        <div class="cbar">
-          <div class="cbar__id"><span class="cbar__code">${c.code}</span><span class="cbar__name">${careerName(c.code) === c.code ? '' : careerName(c.code)}</span></div>
-          <div class="cbar__track"><span class="cbar__fill" style="--w:${(c.n / maxPico) * 100}%"></span></div>
-          <div class="cbar__val">${fmtInt(c.n)}</div>
-        </div>`).join('')}</div>
-    </section>
-
-    <section class="modal__section">
-      <h3>Carrera × hora</h3>
-      <p class="panel__note">Una fila por carrera, una columna por hora — ${qué}. ${heatmapLegend('máx')}</p>
-      <div class="modal__scroll">${hourHeatmap(
-        conCarrera.map((c) => `${c.code}${careerName(c.code) === c.code ? '' : '  ' + careerName(c.code)}`),
-        conCarrera.map((c) => ({ ent: c.hourEnt, sal: c.hourSal })),
-        heatMetric,
-        { padL: 210 },
-      )}</div>
-    </section>
-
-    <section class="modal__section">
-      <h3>Hora pico de cada carrera</h3>
-      <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Código</th><th>Carrera</th><th class="num">Hora pico</th><th class="num">Entradas en esa hora</th><th class="num">Entradas del rango</th></tr></thead>
-          <tbody>${[...conCarrera].sort((a, b) => b.peakHourEnt - a.peakHourEnt).map((c) => `
-            <tr><td>${c.code}</td><td>${careerName(c.code) === c.code ? '—' : careerName(c.code)}</td>
-            <td class="num">${hh(c.peakHour)}</td><td class="num">${fmtInt(c.peakHourEnt)}</td>
-            <td class="num">${fmtInt(c.pasajesEnt)}</td></tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="modal__section">
-      <h3>Día por día · 24 horas</h3>
-      <p class="panel__note">Una fila por día, una columna por hora — ${qué}. ${heatmapLegend(fmtInt(heatMax(m)))}</p>
-      <div class="modal__scroll">${hourHeatmap(m.days.map(dayLabel), m.hourByDay, heatMetric)}</div>
+      <div class="modal__scroll">${hourlyChart(m.hourEnt, m.hourSal, { w: 1120, h: 340, days: m.days.length, metric: heatMetric })}</div>
     </section>`;
 }
 
@@ -550,7 +490,7 @@ function openHourly() {
     'Afluencia por hora',
     `${rangeLabel()} · ${m.days.length} ${m.days.length === 1 ? 'día' : 'días'} × 24 horas`,
     hourlyBody(),
-    segmented([['ent', 'Entradas'], ['sal', 'Salidas']], heatMetric),
+    segmented([['ent', 'Entradas'], ['sal', 'Salidas'], ['both', 'Ambos']], heatMetric),
   );
   $$('#modal-controls button').forEach((b) => b.addEventListener('click', () => {
     heatMetric = b.dataset.v;
@@ -729,6 +669,7 @@ function initBlockedToggle() {
 
 initTheme();
 const renderTeachers = initDocentesView(downloadCSV);
+const renderStudents = initEstudiantesView(downloadCSV);
 $('#mode-students').addEventListener('click', () => { state.mode = 'students'; renderFuentes(); renderAll(); });
 $('#mode-teachers').addEventListener('click', () => { state.mode = 'teachers'; renderFuentes(); renderAll(); });
 initDropzones();
